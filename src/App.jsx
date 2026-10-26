@@ -112,19 +112,23 @@ export default function App() {
 
   // 1. LAVAGENS
   const handleSaveWash = async (washData) => {
-    const saved = await apiSaveWash(washData);
-    setWashes((prev) => {
-      const idx = prev.findIndex((w) => w.id === saved.id);
-      if (idx !== -1) {
-        const updated = [...prev];
-        updated[idx] = saved;
-        return updated;
-      }
-      return [saved, ...prev];
-    });
-    setEditingWash(null);
-    showToast(washData.id ? 'Lavagem atualizada com sucesso!' : 'Lavagem registrada no banco!');
-    setActiveTab('entries');
+    try {
+      const saved = await apiSaveWash(washData);
+      setWashes((prev) => {
+        const idx = prev.findIndex((w) => w.id === saved.id);
+        if (idx !== -1) {
+          const updated = [...prev];
+          updated[idx] = saved;
+          return updated;
+        }
+        return [saved, ...prev];
+      });
+      setEditingWash(null);
+      showToast(washData.id ? 'Lavagem atualizada no banco central!' : 'Lavagem salva no banco central!');
+      setActiveTab('entries');
+    } catch (err) {
+      alert('Aviso: ' + (err.message || 'Falha ao salvar lavagem no banco central.'));
+    }
   };
 
   const handleEditWash = (wash) => {
@@ -137,57 +141,85 @@ export default function App() {
   };
 
   const handleDeleteWash = async (id) => {
-    await apiDeleteWash(id);
-    setWashes((prev) => prev.filter((w) => w.id !== id));
-    showToast('Lavagem removida.');
+    try {
+      await apiDeleteWash(id);
+      setWashes((prev) => prev.filter((w) => w.id !== id));
+      showToast('Lavagem removida do banco central.');
+    } catch (err) {
+      alert('Erro: ' + (err.message || 'Falha ao excluir lavagem.'));
+    }
   };
 
   // 2. VALES
   const handleSaveAdvance = async (advData) => {
-    const saved = await apiSaveAdvance(advData);
-    setAdvances((prev) => [saved, ...prev]);
-    showToast(`Vale de R$ ${advData.value} registrado!`);
-    setActiveTab('entries');
+    try {
+      const saved = await apiSaveAdvance(advData);
+      setAdvances((prev) => [saved, ...prev]);
+      showToast(`Vale de R$ ${advData.value} salvo no banco central!`);
+      setActiveTab('entries');
+    } catch (err) {
+      alert('Aviso: ' + (err.message || 'Falha ao salvar vale no banco central.'));
+    }
   };
 
   const handleDeleteAdvance = async (id) => {
-    await apiDeleteAdvance(id);
-    setAdvances((prev) => prev.filter((a) => a.id !== id));
-    showToast('Vale removido.');
+    try {
+      await apiDeleteAdvance(id);
+      setAdvances((prev) => prev.filter((a) => a.id !== id));
+      showToast('Vale removido do banco central.');
+    } catch (err) {
+      alert('Erro: ' + (err.message || 'Falha ao excluir vale.'));
+    }
   };
 
   // 3. FUNCIONÁRIOS
   const handleSaveEmployee = async (empData) => {
-    const saved = await apiSaveEmployee(empData);
-    setEmployees((prev) => {
-      const idx = prev.findIndex((e) => e.id === saved.id);
-      if (idx !== -1) {
-        const updated = [...prev];
-        updated[idx] = saved;
-        return updated;
-      }
-      return [...prev, saved];
-    });
-    showToast(empData.id ? 'Funcionário atualizado!' : 'Funcionário cadastrado no banco!');
+    try {
+      const saved = await apiSaveEmployee(empData);
+      setEmployees((prev) => {
+        const idx = prev.findIndex((e) => e.id === saved.id);
+        if (idx !== -1) {
+          const updated = [...prev];
+          updated[idx] = saved;
+          return updated;
+        }
+        return [...prev, saved];
+      });
+      showToast(empData.id ? 'Funcionário atualizado no banco!' : 'Funcionário salvo no banco central!');
+    } catch (err) {
+      alert('Erro: ' + (err.message || 'Falha ao salvar funcionário.'));
+    }
   };
 
   const handleToggleActive = async (id) => {
-    const updated = await apiToggleEmployeeActive(id);
-    setEmployees(updated);
+    try {
+      const updated = await apiToggleEmployeeActive(id);
+      setEmployees(updated);
+    } catch (err) {
+      alert('Erro: ' + (err.message || 'Falha ao alterar status.'));
+    }
   };
 
   const handleDeleteEmployee = async (id) => {
-    await apiDeleteEmployee(id);
-    setEmployees((prev) => prev.filter((e) => e.id !== id));
-    showToast('Funcionário removido da equipe.');
+    try {
+      await apiDeleteEmployee(id);
+      setEmployees((prev) => prev.filter((e) => e.id !== id));
+      showToast('Funcionário removido do banco central.');
+    } catch (err) {
+      alert('Erro: ' + (err.message || 'Falha ao excluir funcionário.'));
+    }
   };
 
   // 4. FECHAMENTO
   const handleCloseQuinzena = async (summary) => {
-    await apiCloseQuinzena(summary);
-    await loadData();
-    showToast('Quinzena fechada e salva no banco de dados!');
-    setActiveTab('closing');
+    try {
+      await apiCloseQuinzena(summary);
+      await loadData();
+      showToast('Quinzena fechada e salva no banco central!');
+      setActiveTab('closing');
+    } catch (err) {
+      alert('Erro: ' + (err.message || 'Falha ao fechar quinzena.'));
+    }
   };
 
   return (

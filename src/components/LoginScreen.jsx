@@ -8,11 +8,15 @@ export function LoginScreen({ onLoginSuccess, installPrompt, onInstallApp }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showServerConfig, setShowServerConfig] = useState(false);
-  const [serverUrl, setServerUrl] = useState(() => localStorage.getItem('gl_server_url') || 'https://gentle-crabs-change.loca.lt');
+  const [serverUrl, setServerUrl] = useState(() => {
+    const saved = localStorage.getItem('gl_server_url');
+    if (saved && !saved.includes('loca.lt')) return saved;
+    return '';
+  });
 
   const handleSaveServer = (e) => {
     e.preventDefault();
-    if (serverUrl.trim()) {
+    if (serverUrl.trim() && !serverUrl.includes('loca.lt')) {
       localStorage.setItem('gl_server_url', serverUrl.trim());
     } else {
       localStorage.removeItem('gl_server_url');
@@ -225,7 +229,7 @@ export function LoginScreen({ onLoginSuccess, installPrompt, onInstallApp }) {
               style={{ fontSize: '0.85rem', padding: '8px 10px', marginBottom: 8 }}
               value={serverUrl}
               onChange={(e) => setServerUrl(e.target.value)}
-              placeholder="Ex: http://192.168.1.18:3001"
+              placeholder="Padrão automático (ou https://seu-app.onrender.com)"
             />
             <button
               type="button"

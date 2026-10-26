@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a"/>
+      <stop offset="100%" stop-color="#020617"/>
+    </linearGradient>
+    <linearGradient id="truckGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#34d399"/>
+      <stop offset="100%" stop-color="#059669"/>
+    </linearGradient>
+    <linearGradient id="waterGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8"/>
+      <stop offset="100%" stop-color="#0284c7"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="512" height="512" rx="128" fill="url(#bg)"/>
+  <rect x="16" y="16" width="480" height="480" rx="112" fill="none" stroke="#10b981" stroke-width="8" stroke-opacity="0.3"/>
+
+  <!-- Caminhão Estilizado -->
+  <g transform="translate(64, 110)">
+    <!-- Cabine e Carroceria -->
+    <path d="M 40,80 L 260,80 L 260,260 L 40,260 Z" fill="url(#truckGrad)"/>
+    <path d="M 270,120 L 330,120 L 360,180 L 360,260 L 270,260 Z" fill="url(#truckGrad)"/>
+    <!-- Janela -->
+    <path d="M 280,135 L 325,135 L 345,175 L 280,175 Z" fill="#0f172a" opacity="0.8"/>
+    <!-- Rodas -->
+    <circle cx="90" cy="265" r="34" fill="#1e293b" stroke="#34d399" stroke-width="8"/>
+    <circle cx="210" cy="265" r="34" fill="#1e293b" stroke="#34d399" stroke-width="8"/>
+    <circle cx="320" cy="265" r="34" fill="#1e293b" stroke="#34d399" stroke-width="8"/>
+  </g>
+
+  <!-- Gotas de Água / Brilho de Lavagem -->
+  <path d="M 256,50 C 256,50 220,100 220,125 C 220,145 236,160 256,160 C 276,160 292,145 292,125 C 292,100 256,50 256,50 Z" fill="url(#waterGrad)"/>
+</svg>

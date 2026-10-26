@@ -1,22 +1,13 @@
-// Serviço de Comunicação com o Banco Online com Autenticação e Perfis (CEO, Gerente, Funcionário)
-import * as localFallback from './storage';
+// Serviço de Comunicação Direta com o Banco de Dados Central Online
+// Centraliza todas as operações no servidor (Render / PostgreSQL / Node)
 
 export function getApiBase() {
-  // Se estiver rodando dentro do app nativo Android (Capacitor)
-  const isCapacitor = typeof window !== 'undefined' && (
-    window.location.protocol === 'capacitor:' || 
-    (window.location.hostname === 'localhost' && window.location.port === '')
-  );
-
-  if (isCapacitor) {
-    const custom = localStorage.getItem('gl_server_url');
-    if (custom && custom.trim()) {
-      return custom.trim().replace(/\/$/, '') + '/api';
-    }
-    return 'https://gentle-crabs-change.loca.lt/api';
+  const custom = typeof window !== 'undefined' ? localStorage.getItem('gl_server_url') : null;
+  if (custom && custom.trim() && !custom.includes('loca.lt')) {
+    return custom.trim().replace(/\/$/, '') + '/api';
   }
 
-  // Em qualquer navegador web, PWA ou via túnel loca.lt: sempre use '/api' relativo ao próprio host
+  // Em qualquer navegador web, PWA ou Render: sempre usa '/api' relativo ao domínio atual
   return '/api';
 }
 
@@ -57,11 +48,12 @@ function getAuthHeaders() {
   };
 }
 
-// 2. STATUS DO SERVIDOR
+// 2. STATUS DO SERVIDOR CENTRAL
 export async function checkServerStatus() {
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 2500);
+    // Timeout de 10s para permitir acordar instâncias em cold-start no Render
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
     const res = await fetch(`${getApiBase()}/status`, { signal: controller.signal });
     clearTimeout(timeoutId);
     isOnline = res.ok;
@@ -100,7 +92,7 @@ export async function apiLogout() {
       headers: getAuthHeaders(),
     });
   } catch {
-    // Logout local mesmo offline
+    // Continua para limpar a sessão mesmo offline
   }
   clearSession();
 }
@@ -111,7 +103,12 @@ export async function fetchMyPortalData() {
     headers: getAuthHeaders(),
   });
   if (!res.ok) {
-    throw new Error('Erro ao carregar dados do funcionário.');
+    if (res.status === 401) {
+      clearSession();
+      window.location.reload();
+    }
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || 'Erro ao carregar dados do funcionário.');
   }
   return res.json();
 }
@@ -122,7 +119,7 @@ export async function fetchUsers() {
     headers: getAuthHeaders(),
   });
   if (!res.ok) {
-    const err = await res.json();
+    const err = await res.json().catch(() => ({}));
     throw new Error(err.error || 'Erro ao carregar usuários.');
   }
   const data = await res.json();
@@ -157,165 +154,164 @@ export async function apiDeleteUser(id) {
 // 6. CARREGAR DADOS OPERACIONAIS (Gerente e CEO)
 export async function fetchAllData() {
   try {
-    const online = await checkServerStatus();
-    if (online) {
-      const res = await fetch(`${getApiBase()}/data`, {
-        headers: getAuthHeaders(),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        localStorage.setItem('gl_employees', JSON.stringify(data.employees));
-        localStorage.setItem('gl_washes', JSON.stringify(data.washes));
-        localStorage.setItem('gl_advances', JSON.stringify(data.advances));
-        localStorage.setItem('gl_closed_quinzenas', JSON.stringify(data.closedQuinzenas));
-        localStorage.setItem('gl_current_quinzena_id', data.currentQuinzenaId);
-        return { ...data, source: 'cloud' };
-      }
-    }
-  } catch (err) {
-    console.warn('Usando dados em cache local:', err);
-  }
-
-  // Fallback Local
-  return {
-    source: 'local',
-    currentQuinzenaId: localFallback.getCurrentQuinzenaId(),
-    employees: localFallback.getEmployees(),
-    washes: localFallback.getCurrentWashes(),
-    advances: localFallback.getCurrentAdvances(),
-    closedQuinzenas: localFallback.getClosedQuinzenas(),
-  };
-}
-
-// 7. AÇÕES OPERACIONAIS (LAVAGENS, VALES, EQUIPE, FECHAMENTO)
-export async function apiSaveWash(washData) {
-  let localWash = localFallback.saveWash(washData);
-  try {
-    const res = await fetch(`${getApiBase()}/washes`, {
-      method: 'POST',
+    const res = await fetch(`${getApiBase()}/data`, {
       headers: getAuthHeaders(),
-      body: JSON.stringify(localWash),
     });
     if (res.ok) {
+      const data = await res.json();
       isOnline = true;
-      const json = await res.json();
-      if (json.wash) {
-        localWash = localFallback.saveWash(json.wash);
-      }
+      // Salva cópia local apenas para leitura temporária em caso de queda de rede
+      localStorage.setItem('gl_employees', JSON.stringify(data.employees || []));
+      localStorage.setItem('gl_washes', JSON.stringify(data.washes || []));
+      localStorage.setItem('gl_advances', JSON.stringify(data.advances || []));
+      localStorage.setItem('gl_closed_quinzenas', JSON.stringify(data.closedQuinzenas || []));
+      localStorage.setItem('gl_current_quinzena_id', data.currentQuinzenaId || 'q_default');
+      return { ...data, source: 'cloud' };
+    } else if (res.status === 401) {
+      clearSession();
+      window.location.reload();
+      throw new Error('Sessão expirada. Faça login novamente.');
     }
   } catch (err) {
-    console.warn('Salvo localmente (offline):', err);
+    console.warn('Banco central indisponível no momento:', err);
   }
-  return localWash;
+
+  isOnline = false;
+  // Fallback de cache local da última sincronização real
+  try {
+    const employees = JSON.parse(localStorage.getItem('gl_employees') || '[]');
+    const washes = JSON.parse(localStorage.getItem('gl_washes') || '[]');
+    const advances = JSON.parse(localStorage.getItem('gl_advances') || '[]');
+    const closedQuinzenas = JSON.parse(localStorage.getItem('gl_closed_quinzenas') || '[]');
+    const currentQuinzenaId = localStorage.getItem('gl_current_quinzena_id') || 'q_default';
+    return {
+      source: 'local',
+      currentQuinzenaId,
+      employees,
+      washes,
+      advances,
+      closedQuinzenas,
+    };
+  } catch {
+    return {
+      source: 'local',
+      currentQuinzenaId: 'q_default',
+      employees: [],
+      washes: [],
+      advances: [],
+      closedQuinzenas: [],
+    };
+  }
+}
+
+// 7. AÇÕES OPERACIONAIS (DIRETO NO BANCO CENTRAL)
+export async function apiSaveWash(washData) {
+  const res = await fetch(`${getApiBase()}/washes`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(washData),
+  });
+
+  const json = await res.json();
+  if (!res.ok) {
+    throw new Error(json.error || 'Erro ao registrar lavagem no banco central.');
+  }
+
+  isOnline = true;
+  return json.wash || json;
 }
 
 export async function apiDeleteWash(id) {
-  localFallback.deleteWash(id);
-  try {
-    const res = await fetch(`${getApiBase()}/washes/${id}`, {
-      method: 'DELETE',
-      headers: getAuthHeaders(),
-    });
-    if (res.ok) isOnline = true;
-  } catch (err) {
-    console.warn('Erro ao excluir no banco online:', err);
+  const res = await fetch(`${getApiBase()}/washes/${id}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) {
+    const json = await res.json();
+    throw new Error(json.error || 'Erro ao excluir lavagem no banco central.');
   }
+  isOnline = true;
 }
 
 export async function apiSaveAdvance(advData) {
-  let localAdv = localFallback.saveAdvance(advData);
-  try {
-    const res = await fetch(`${getApiBase()}/advances`, {
-      method: 'POST',
-      headers: getAuthHeaders(),
-      body: JSON.stringify(localAdv),
-    });
-    if (res.ok) {
-      isOnline = true;
-      const json = await res.json();
-      if (json.advance) {
-        localAdv = localFallback.saveAdvance(json.advance);
-      }
-    }
-  } catch (err) {
-    console.warn('Vale salvo localmente (offline):', err);
+  const res = await fetch(`${getApiBase()}/advances`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(advData),
+  });
+
+  const json = await res.json();
+  if (!res.ok) {
+    throw new Error(json.error || 'Erro ao registrar vale no banco central.');
   }
-  return localAdv;
+
+  isOnline = true;
+  return json.advance || json;
 }
 
 export async function apiDeleteAdvance(id) {
-  localFallback.deleteAdvance(id);
-  try {
-    const res = await fetch(`${getApiBase()}/advances/${id}`, {
-      method: 'DELETE',
-      headers: getAuthHeaders(),
-    });
-    if (res.ok) isOnline = true;
-  } catch (err) {
-    console.warn('Erro ao excluir vale no banco online:', err);
+  const res = await fetch(`${getApiBase()}/advances/${id}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) {
+    const json = await res.json();
+    throw new Error(json.error || 'Erro ao excluir vale no banco central.');
   }
+  isOnline = true;
 }
 
 export async function apiSaveEmployee(empData) {
-  let localEmp = localFallback.saveEmployee(empData);
-  try {
-    const res = await fetch(`${getApiBase()}/employees`, {
-      method: 'POST',
-      headers: getAuthHeaders(),
-      body: JSON.stringify(localEmp),
-    });
-    if (res.ok) {
-      isOnline = true;
-      const json = await res.json();
-      if (json.id) {
-        localEmp.id = json.id;
-      }
-    }
-  } catch (err) {
-    console.warn('Funcionário salvo localmente (offline):', err);
+  const res = await fetch(`${getApiBase()}/employees`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(empData),
+  });
+
+  const json = await res.json();
+  if (!res.ok) {
+    throw new Error(json.error || 'Erro ao registrar funcionário no banco central.');
   }
-  return localEmp;
+
+  isOnline = true;
+  return json;
 }
 
 export async function apiToggleEmployeeActive(id) {
-  const updated = localFallback.toggleEmployeeActive(id);
-  try {
-    const res = await fetch(`${getApiBase()}/employees/${id}/toggle`, {
-      method: 'PATCH',
-      headers: getAuthHeaders(),
-    });
-    if (res.ok) isOnline = true;
-  } catch (err) {
-    console.warn('Status alternado localmente:', err);
+  const res = await fetch(`${getApiBase()}/employees/${id}/toggle`, {
+    method: 'PATCH',
+    headers: getAuthHeaders(),
+  });
+  const json = await res.json();
+  if (!res.ok) {
+    throw new Error(json.error || 'Erro ao alterar status do funcionário.');
   }
-  return updated;
+  isOnline = true;
+  return json.employees;
 }
 
 export async function apiDeleteEmployee(id) {
-  const updated = localFallback.deleteEmployee(id);
-  try {
-    const res = await fetch(`${getApiBase()}/employees/${id}`, {
-      method: 'DELETE',
-      headers: getAuthHeaders(),
-    });
-    if (res.ok) isOnline = true;
-  } catch (err) {
-    console.warn('Erro ao excluir funcionário no servidor:', err);
+  const res = await fetch(`${getApiBase()}/employees/${id}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) {
+    const json = await res.json();
+    throw new Error(json.error || 'Erro ao remover funcionário no banco central.');
   }
-  return updated;
+  isOnline = true;
 }
 
 export async function apiCloseQuinzena(summary) {
-  const localRecord = localFallback.closeCurrentQuinzena(summary);
-  try {
-    const res = await fetch(`${getApiBase()}/quinzena/close`, {
-      method: 'POST',
-      headers: getAuthHeaders(),
-      body: JSON.stringify(summary),
-    });
-    if (res.ok) isOnline = true;
-  } catch (err) {
-    console.warn('Quinzena fechada localmente:', err);
+  const res = await fetch(`${getApiBase()}/quinzena/close`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(summary),
+  });
+  const json = await res.json();
+  if (!res.ok) {
+    throw new Error(json.error || 'Erro ao fechar quinzena no banco central.');
   }
-  return localRecord;
+  isOnline = true;
+  return json;
 }

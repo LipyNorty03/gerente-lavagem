@@ -19,11 +19,13 @@
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
     <script>
-      // Registro do Service Worker para funcionamento 100% offline
+      // Registro do Service Worker com atualização garantida
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js').catch((err) => {
-            console.log('ServiceWorker registration failed: ', err);
+          navigator.serviceWorker.register('/sw.js').then((registration) => {
+            registration.update();
+          }).catch((err) => {
+            console.log('ServiceWorker registration error: ', err);
           });
         });
       }

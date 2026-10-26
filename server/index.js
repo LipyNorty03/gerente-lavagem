@@ -101,14 +101,24 @@ async function getAuthenticatedUser(req) {
     return null;
   }
   const token = authHeader.substring(7).trim();
-  return await queryOne(
-    `SELECT s.token, u.id, u.username, u.name, u.role, u.employee_id as "employeeId", e.acronym as "employeeAcronym"
+  const row = await queryOne(
+    `SELECT s.token, u.id, u.username, u.name, u.role, u.employee_id, e.acronym as employee_acronym
      FROM sessions s
      JOIN users u ON s.user_id = u.id
      LEFT JOIN employees e ON u.employee_id = e.id
      WHERE s.token = ?`,
     [token]
   );
+  if (!row) return null;
+  return {
+    token: row.token,
+    id: row.id,
+    username: row.username,
+    name: row.name,
+    role: row.role,
+    employeeId: row.employee_id || row.employeeId || null,
+    employeeAcronym: row.employee_acronym || row.employeeAcronym || null,
+  };
 }
 
 const server = http.createServer(async (req, res) => {
@@ -181,8 +191,8 @@ const server = http.createServer(async (req, res) => {
           username: user.username,
           name: user.name,
           role: user.role,
-          employeeId: user.employeeId,
-          employeeAcronym: user.employeeAcronym,
+          employeeId: user.employeeId || user.employee_id || null,
+          employeeAcronym: user.employeeAcronym || user.employee_acronym || null,
         },
       });
     }
@@ -232,7 +242,8 @@ const server = http.createServer(async (req, res) => {
       const myWashes = rawWashes
         .filter((w) => {
           const ids = JSON.parse(w.employee_ids || '[]');
-          return ids.includes(empId);
+          const acronyms = JSON.parse(w.employee_acronyms || '[]');
+          return ids.includes(empId) || (user.employeeAcronym && acronyms.includes(user.employeeAcronym));
         })
         .map((w) => ({
           id: w.id,
@@ -247,8 +258,8 @@ const server = http.createServer(async (req, res) => {
 
       const rawMyAdvances = await query(
         `SELECT id, created_at, advance_date, value, note
-         FROM advances WHERE quinzena_id = ? AND employee_id = ? ORDER BY created_at DESC`,
-        [currentQId, empId]
+         FROM advances WHERE quinzena_id = ? AND (employee_id = ? OR (employee_acronym = ? AND employee_acronym != '')) ORDER BY created_at DESC`,
+        [currentQId, empId, user.employeeAcronym || '']
       );
       const myAdvances = rawMyAdvances.map((a) => ({
         id: a.id,

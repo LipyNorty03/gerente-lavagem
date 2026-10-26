@@ -1,0 +1,18 @@
+{
+  "short_name": "Gerente Lavagem",
+  "name": "Gerente Virtual - Lavagem de Caminhões",
+  "description": "Controle de lavagens de caminhões, comissões por siglas e fechamentos quinzenais.",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#0b1120",
+  "theme_color": "#131c2e",
+  "display": "standalone",
+  "orientation": "portrait"
+}

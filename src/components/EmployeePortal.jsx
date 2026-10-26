@@ -6,7 +6,20 @@ import { formatCurrency, formatDateTime, formatDayHeader } from '../services/cal
 export function EmployeePortal({ user, onLogout }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('washes');
+  const [activeTab, setActiveTabState] = useState(() => {
+    try {
+      return localStorage.getItem('gl_emp_tab') || 'washes';
+    } catch {
+      return 'washes';
+    }
+  });
+
+  const setActiveTab = (tab) => {
+    setActiveTabState(tab);
+    try {
+      localStorage.setItem('gl_emp_tab', tab);
+    } catch {}
+  };
 
   const loadPortalData = useCallback(async () => {
     setLoading(true);

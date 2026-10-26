@@ -9,7 +9,20 @@ export function EntriesList({
   onDeleteWash,
   onDeleteAdvance,
 }) {
-  const [activeTab, setActiveTab] = useState('by_day'); // 'by_day' | 'washes' | 'advances'
+  const [activeTab, setActiveTabState] = useState(() => {
+    try {
+      return localStorage.getItem('gl_entries_tab') || 'by_day';
+    } catch {
+      return 'by_day';
+    }
+  });
+
+  const setActiveTab = (tab) => {
+    setActiveTabState(tab);
+    try {
+      localStorage.setItem('gl_entries_tab', tab);
+    } catch {}
+  };
   const [copiedDate, setCopiedDate] = useState(null);
 
   // Agrupamento de lavagens por data do serviço (ou data de criação)

@@ -27,7 +27,21 @@ import { Navbar } from './components/Navbar';
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState(() => getStoredUser());
-  const [activeTab, setActiveTab] = useState('wash');
+  const [activeTab, setActiveTabState] = useState(() => {
+    try {
+      return localStorage.getItem('gl_active_tab') || 'wash';
+    } catch {
+      return 'wash';
+    }
+  });
+
+  const setActiveTab = useCallback((tab) => {
+    setActiveTabState(tab);
+    try {
+      localStorage.setItem('gl_active_tab', tab);
+    } catch {}
+  }, []);
+
   const [employees, setEmployees] = useState([]);
   const [washes, setWashes] = useState([]);
   const [advances, setAdvances] = useState([]);
@@ -57,6 +71,11 @@ export default function App() {
 
   const handleLogout = async () => {
     await apiLogout();
+    try {
+      localStorage.removeItem('gl_active_tab');
+      localStorage.removeItem('gl_entries_tab');
+      localStorage.removeItem('gl_emp_tab');
+    } catch {}
     setCurrentUser(null);
   };
 
@@ -109,6 +128,7 @@ export default function App() {
 
   // 3. SE FOR GERENTE OU CEO -> PAINEL OPERACIONAL COMPLETO
   const isCeo = currentUser.role === 'ceo';
+  const effectiveTab = activeTab === 'users' && !isCeo ? 'entries' : activeTab;
 
   // 1. LAVAGENS
   const handleSaveWash = async (washData) => {
@@ -313,7 +333,7 @@ export default function App() {
 
       {/* Área de Conteúdo */}
       <main className="content-area">
-        {activeTab === 'wash' && (
+        {effectiveTab === 'wash' && (
           <WashForm
             employees={employees}
             onSaveWash={handleSaveWash}
@@ -322,14 +342,14 @@ export default function App() {
           />
         )}
 
-        {activeTab === 'advance' && (
+        {effectiveTab === 'advance' && (
           <AdvanceForm
             employees={employees}
             onSaveAdvance={handleSaveAdvance}
           />
         )}
 
-        {activeTab === 'entries' && (
+        {effectiveTab === 'entries' && (
           <EntriesList
             washes={washes}
             advances={advances}
@@ -339,7 +359,7 @@ export default function App() {
           />
         )}
 
-        {activeTab === 'closing' && (
+        {effectiveTab === 'closing' && (
           <ClosingView
             employees={employees}
             washes={washes}
@@ -349,7 +369,7 @@ export default function App() {
           />
         )}
 
-        {activeTab === 'team' && (
+        {effectiveTab === 'team' && (
           <TeamView
             employees={employees}
             onSaveEmployee={handleSaveEmployee}
@@ -359,7 +379,7 @@ export default function App() {
         )}
 
         {/* Aba Exclusiva do CEO: Gestão de Usuários e Cargos */}
-        {activeTab === 'users' && isCeo && (
+        {effectiveTab === 'users' && isCeo && (
           <UserManagementView
             currentUser={currentUser}
             employees={employees}
@@ -369,7 +389,7 @@ export default function App() {
 
       {/* Navegação Inferior Dock */}
       <Navbar
-        activeTab={activeTab}
+        activeTab={effectiveTab}
         setActiveTab={setActiveTab}
         washCount={washes.length}
         advanceCount={advances.length}

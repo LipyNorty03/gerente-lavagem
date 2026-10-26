@@ -94,6 +94,20 @@ function parseJsonBody(req) {
   });
 }
 
+function truncateToTwoDecimals(value) {
+  const n = Number(value);
+  if (isNaN(n) || n === 0) return 0;
+  const isNegative = n < 0;
+  const absN = Math.abs(n);
+  const s = String(absN);
+  let result = absN;
+  if (s.includes('.')) {
+    const [integ, dec] = s.split('.');
+    result = Number(`${integ}.${dec.slice(0, 2)}`);
+  }
+  return isNegative ? -result : result;
+}
+
 // Extrai o usuário da sessão a partir do cabeçalho Authorization
 async function getAuthenticatedUser(req) {
   const authHeader = req.headers['authorization'];
@@ -271,9 +285,9 @@ const server = http.createServer(async (req, res) => {
         note: a.note,
       }));
 
-      const totalCommission = myWashes.reduce((sum, w) => sum + (w.valuePerEmployee || 0), 0);
-      const totalAdvances = myAdvances.reduce((sum, a) => sum + (Number(a.value) || 0), 0);
-      const netToPay = Math.max(0, totalCommission - totalAdvances);
+      const totalCommission = truncateToTwoDecimals(myWashes.reduce((sum, w) => sum + (w.valuePerEmployee || 0), 0));
+      const totalAdvances = truncateToTwoDecimals(myAdvances.reduce((sum, a) => sum + (Number(a.value) || 0), 0));
+      const netToPay = Math.max(0, truncateToTwoDecimals(totalCommission - totalAdvances));
 
       return sendJson(res, 200, {
         user,
@@ -482,12 +496,12 @@ const server = http.createServer(async (req, res) => {
       const createdAt = data.createdAt || new Date().toISOString();
       const serviceDate = data.serviceDate || data.date || (createdAt ? createdAt.substring(0, 10) : new Date().toISOString().substring(0, 10));
 
-      const totalVal = Number(data.totalValue) || 0;
-      const prodFee = Number(data.productFee) || 10;
-      const baseVal = Number(data.baseValue) || 0;
-      const houseVal = Number(data.houseValue) || 0;
-      const teamVal = Number(data.teamValue) || 0;
-      const valPerEmp = Number(data.valuePerEmployee) || 0;
+      const totalVal = truncateToTwoDecimals(Number(data.totalValue) || 0);
+      const prodFee = truncateToTwoDecimals(Number(data.productFee) || 10);
+      const baseVal = truncateToTwoDecimals(Number(data.baseValue) || 0);
+      const houseVal = truncateToTwoDecimals(Number(data.houseValue) || 0);
+      const teamVal = truncateToTwoDecimals(Number(data.teamValue) || 0);
+      const valPerEmp = truncateToTwoDecimals(Number(data.valuePerEmployee) || 0);
 
       await execute(
         `INSERT INTO washes (

@@ -415,21 +415,25 @@ export function EmployeePortal({ user, onLogout }) {
                                       flexWrap: 'wrap',
                                     }}
                                   >
+                                    <span
+                                      style={{
+                                        backgroundColor: '#0c2d48',
+                                        color: '#38bdf8',
+                                        border: '1px solid #0284c7',
+                                        fontWeight: 800,
+                                        padding: '2px 8px',
+                                        borderRadius: 6,
+                                        fontSize: '0.74rem',
+                                        textTransform: 'uppercase',
+                                      }}
+                                    >
+                                      🏢 {w.company || 'Veículo / Cliente Avulso'}
+                                    </span>
                                     {w.plate && (
-                                      <span
-                                        style={{
-                                          backgroundColor: '#1e293b',
-                                          color: '#38bdf8',
-                                          fontWeight: 700,
-                                          padding: '1px 5px',
-                                          borderRadius: 4,
-                                          fontSize: '0.7rem',
-                                        }}
-                                      >
-                                        {w.plate}
+                                      <span style={{ color: '#94a3b8', fontSize: '0.72rem', fontWeight: 600 }}>
+                                        Placa: {w.plate}
                                       </span>
                                     )}
-                                    {w.company && <span>{w.company}</span>}
                                     <span style={{ color: '#64748b' }}>•</span>
                                     <span style={{ textTransform: 'uppercase' }}>{w.paymentMethod}</span>
                                   </div>

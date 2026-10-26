@@ -3,6 +3,25 @@
 export const PRODUCT_FEE = 10.0; // R$ 10,00 fixo por caminhão
 
 /**
+ * Trunca um número para 2 casas decimais sem arredondar para cima.
+ * Ex: 5.6799999999 -> 5.67 | 56.6666666667 -> 56.66
+ */
+export function truncateToTwoDecimals(value) {
+  const n = Number(value);
+  if (isNaN(n) || n === 0) return 0;
+  const isNegative = n < 0;
+  const absN = Math.abs(n);
+  const s = String(absN);
+
+  let result = absN;
+  if (s.includes('.')) {
+    const [integ, dec] = s.split('.');
+    result = Number(`${integ}.${dec.slice(0, 2)}`);
+  }
+  return isNegative ? -result : result;
+}
+
+/**
  * Calcula a divisão da lavagem
  * @param {number} totalValue - Valor bruto cobrado da lavagem
  * @param {number} employeeCount - Quantidade de funcionários participantes
@@ -24,12 +43,13 @@ export function calculateWashSplit(totalValue, employeeCount) {
   const productFee = Math.min(PRODUCT_FEE, total);
   const baseValue = Math.max(0, total - productFee);
 
-  // 50% Casa, 50% Equipe
-  const houseValue = baseValue * 0.5;
-  const teamValue = baseValue * 0.5;
+  // 50% Casa, 50% Equipe (truncado para 2 casas decimais sem arredondar)
+  const houseValue = truncateToTwoDecimals(baseValue * 0.5);
+  const teamValue = truncateToTwoDecimals(baseValue * 0.5);
 
   const count = Number(employeeCount) || 0;
-  const valuePerEmployee = count > 0 ? teamValue / count : 0;
+  const rawPerEmp = count > 0 ? teamValue / count : 0;
+  const valuePerEmployee = truncateToTwoDecimals(rawPerEmp);
 
   return {
     totalValue: total,
@@ -42,13 +62,29 @@ export function calculateWashSplit(totalValue, employeeCount) {
 }
 
 /**
- * Formata valor para moeda brasileira (R$)
+ * Formata valor para moeda brasileira (R$) mantendo os primeiros centavos sem arredondar para cima.
+ * Ex: 5,6799999999 = R$ 5,67 | 56,6666666667 = R$ 56,66
  */
 export function formatCurrency(value) {
-  return (Number(value) || 0).toLocaleString('pt-BR', {
-    style: 'currency',
-    currency: 'BRL',
-  });
+  const n = Number(value);
+  if (isNaN(n) || n === 0) return 'R$ 0,00';
+  const isNegative = n < 0;
+  const absN = Math.abs(n);
+  const s = String(absN);
+
+  let integerStr = '0';
+  let decimalStr = '00';
+
+  if (s.includes('.')) {
+    const [integ, dec] = s.split('.');
+    integerStr = Number(integ).toLocaleString('pt-BR');
+    decimalStr = (dec + '00').slice(0, 2);
+  } else {
+    integerStr = absN.toLocaleString('pt-BR');
+    decimalStr = '00';
+  }
+
+  return `${isNegative ? '- ' : ''}R$ ${integerStr},${decimalStr}`;
 }
 
 /**

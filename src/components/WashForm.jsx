@@ -147,28 +147,16 @@ export function WashForm({ employees, onSaveWash, editingWash, onCancelEdit }) {
         />
       </div>
 
-      {/* Placa do Caminhão */}
+      {/* Empresa ou Nome do Veículo (Destaque Principal) */}
       <div className="form-group">
-        <label className="form-label">Placa do Caminhão</label>
-        <input
-          type="text"
-          className="input-field plate-input"
-          placeholder="ABC-1234 / BRA2E19"
-          value={plate}
-          maxLength={8}
-          onChange={(e) => setPlate(e.target.value.toUpperCase())}
-          autoCapitalize="characters"
-        />
-      </div>
-
-      {/* Empresa / Frotista */}
-      <div className="form-group">
-        <label className="form-label">Empresa / Frotista</label>
+        <label className="form-label" style={{ color: '#38bdf8', fontWeight: 800 }}>
+          🏢 Nome da Empresa ou Veículo (Em Destaque)
+        </label>
         <div style={{ position: 'relative' }}>
           <input
             type="text"
             className="input-field"
-            placeholder="Ex: Transportadora Sol, Autônomo..."
+            placeholder="Ex: Carreta Scania, Rodonaves, Bitrem..."
             value={company}
             onChange={(e) => setCompany(e.target.value)}
           />
@@ -187,6 +175,22 @@ export function WashForm({ employees, onSaveWash, editingWash, onCancelEdit }) {
             ))}
           </div>
         )}
+      </div>
+
+      {/* Placa do Veículo (Secundário) */}
+      <div className="form-group">
+        <label className="form-label" style={{ color: '#94a3b8' }}>
+          Placa do Veículo (Opcional)
+        </label>
+        <input
+          type="text"
+          className="input-field plate-input"
+          placeholder="ABC-1234 / BRA2E19"
+          value={plate}
+          maxLength={8}
+          onChange={(e) => setPlate(e.target.value.toUpperCase())}
+          autoCapitalize="characters"
+        />
       </div>
 
       {/* Forma de Pagamento */}

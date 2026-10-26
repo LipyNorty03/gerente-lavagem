@@ -322,7 +322,7 @@ export function EntriesList({
                                   </span>
                                 </div>
 
-                                {/* Informações adicionais discretas */}
+                                {/* Empresa ou Veículo em Destaque */}
                                 <div
                                   style={{
                                     display: 'flex',
@@ -334,21 +334,25 @@ export function EntriesList({
                                     flexWrap: 'wrap',
                                   }}
                                 >
+                                  <span
+                                    style={{
+                                      backgroundColor: '#0c2d48',
+                                      color: '#38bdf8',
+                                      border: '1px solid #0284c7',
+                                      fontWeight: 800,
+                                      padding: '2px 8px',
+                                      borderRadius: 6,
+                                      fontSize: '0.76rem',
+                                      textTransform: 'uppercase',
+                                    }}
+                                  >
+                                    🏢 {w.company || 'Veículo / Cliente Avulso'}
+                                  </span>
                                   {w.plate && (
-                                    <span
-                                      style={{
-                                        backgroundColor: '#1e293b',
-                                        color: '#38bdf8',
-                                        fontWeight: 700,
-                                        padding: '1px 5px',
-                                        borderRadius: 4,
-                                        fontSize: '0.7rem',
-                                      }}
-                                    >
-                                      {w.plate}
+                                    <span style={{ color: '#94a3b8', fontSize: '0.72rem', fontWeight: 600 }}>
+                                      Placa: {w.plate}
                                     </span>
                                   )}
-                                  {w.company && <span>{w.company}</span>}
                                   <span style={{ color: '#64748b' }}>•</span>
                                   <span style={{ textTransform: 'uppercase' }}>{w.paymentMethod}</span>
                                   <span style={{ color: '#64748b' }}>•</span>
@@ -417,8 +421,22 @@ export function EntriesList({
             sortedWashesAsc.map((w) => (
               <div key={w.id} className="entry-card">
                 <div style={{ flex: 1, overflow: 'hidden' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span className="entry-plate">{w.plate || 'SEM PLACA'}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    <span
+                      style={{
+                        backgroundColor: '#0c2d48',
+                        color: '#38bdf8',
+                        border: '1.5px solid #0284c7',
+                        padding: '4px 10px',
+                        borderRadius: 8,
+                        fontWeight: 900,
+                        fontSize: '0.95rem',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.02em',
+                      }}
+                    >
+                      🏢 {w.company || 'Veículo / Cliente Avulso'}
+                    </span>
                     <span
                       style={{
                         fontSize: '0.7rem',
@@ -434,7 +452,9 @@ export function EntriesList({
                     </span>
                   </div>
 
-                  <div className="entry-company">{w.company || 'Cliente Avulso'}</div>
+                  <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginTop: 4 }}>
+                    Placa: <strong style={{ color: '#cbd5e1' }}>{w.plate || 'SEM PLACA'}</strong>
+                  </div>
 
                   <div className="entry-acronyms">
                     {w.employeeAcronyms?.map((acr, i) => (

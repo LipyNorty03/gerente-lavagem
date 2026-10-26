@@ -126,3 +126,105 @@ export function formatDayHeader(dateInput) {
   });
   return `${weekdayCapitalized}, ${formattedDate}`;
 }
+
+/**
+ * Agrupa lavagens por Semana (Semana 1 e Semana 2) e por Dia em ordem CRESCENTE.
+ */
+export function groupWashesByWeekAndDay(washes = []) {
+  if (!washes || washes.length === 0) return [];
+
+  const getDateKey = (w) =>
+    w.serviceDate ||
+    (w.date ? w.date.substring(0, 10) : '') ||
+    (w.createdAt ? w.createdAt.substring(0, 10) : 'Sem Data');
+
+  const validDates = washes
+    .map(getDateKey)
+    .filter((d) => d && d !== 'Sem Data' && d.includes('-'));
+
+  // Menor data registrada na quinzena para determinar o marco inicial
+  const minDateStr = validDates.length > 0 ? [...validDates].sort()[0] : null;
+
+  const getWeekId = (dateStr) => {
+    if (!dateStr || dateStr === 'Sem Data') return 'semana_1';
+
+    if (minDateStr) {
+      const d = new Date(dateStr + 'T12:00:00');
+      const minD = new Date(minDateStr + 'T12:00:00');
+      const diffDays = Math.floor((d - minD) / (1000 * 60 * 60 * 24));
+      if (diffDays >= 7) return 'semana_2';
+      return 'semana_1';
+    }
+
+    const day = parseInt(dateStr.split('-')[2], 10);
+    if ((day >= 8 && day <= 15) || day >= 23) {
+      return 'semana_2';
+    }
+    return 'semana_1';
+  };
+
+  const dayGroups = {};
+  washes.forEach((w) => {
+    const rawDate = getDateKey(w);
+    if (!dayGroups[rawDate]) {
+      dayGroups[rawDate] = [];
+    }
+    dayGroups[rawDate].push(w);
+  });
+
+  // Ordenação CRESCENTE (ascendente): segunda 23, terça 24, quarta 25...
+  const sortedDatesAsc = Object.keys(dayGroups).sort((a, b) => {
+    if (a === 'Sem Data') return 1;
+    if (b === 'Sem Data') return -1;
+    return a.localeCompare(b);
+  });
+
+  const week1Days = [];
+  const week2Days = [];
+
+  sortedDatesAsc.forEach((dateKey) => {
+    const dayWashes = dayGroups[dateKey];
+    const dayTotal = dayWashes.reduce((sum, item) => sum + (Number(item.totalValue) || 0), 0);
+    const dayCommission = dayWashes.reduce((sum, item) => sum + (Number(item.valuePerEmployee) || 0), 0);
+
+    const dayObj = {
+      date: dateKey,
+      washes: dayWashes,
+      totalValue: dayTotal,
+      totalCommission: dayCommission,
+      washCount: dayWashes.length,
+    };
+
+    if (getWeekId(dateKey) === 'semana_2') {
+      week2Days.push(dayObj);
+    } else {
+      week1Days.push(dayObj);
+    }
+  });
+
+  const result = [];
+
+  if (week1Days.length > 0) {
+    result.push({
+      id: 'semana_1',
+      label: 'Semana 1',
+      days: week1Days,
+      totalValue: week1Days.reduce((sum, d) => sum + d.totalValue, 0),
+      totalCommission: week1Days.reduce((sum, d) => sum + d.totalCommission, 0),
+      washCount: week1Days.reduce((sum, d) => sum + d.washCount, 0),
+    });
+  }
+
+  if (week2Days.length > 0) {
+    result.push({
+      id: 'semana_2',
+      label: 'Semana 2',
+      days: week2Days,
+      totalValue: week2Days.reduce((sum, d) => sum + d.totalValue, 0),
+      totalCommission: week2Days.reduce((sum, d) => sum + d.totalCommission, 0),
+      washCount: week2Days.reduce((sum, d) => sum + d.washCount, 0),
+    });
+  }
+
+  return result;
+}

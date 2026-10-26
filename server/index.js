@@ -254,6 +254,8 @@ const server = http.createServer(async (req, res) => {
           paymentMethod: w.payment_method,
           totalValue: Number(w.total_value) || 0,
           valuePerEmployee: Number(w.value_per_employee) || 0,
+          employeeAcronyms: JSON.parse(w.employee_acronyms || '[]'),
+          employeeIds: JSON.parse(w.employee_ids || '[]'),
         }));
 
       const rawMyAdvances = await query(

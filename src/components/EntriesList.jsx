@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Truck, DollarSign, Edit2, Trash2, Calendar, FileText, Copy, Check } from 'lucide-react';
-import { formatCurrency, formatDateTime, formatDayHeader } from '../services/calculations';
+import { formatCurrency, formatDateTime, formatDayHeader, groupWashesByWeekAndDay } from '../services/calculations';
 
 export function EntriesList({
   washes,
@@ -23,40 +23,35 @@ export function EntriesList({
       localStorage.setItem('gl_entries_tab', tab);
     } catch {}
   };
+
   const [copiedDate, setCopiedDate] = useState(null);
 
-  // Agrupamento de lavagens por data do serviço (ou data de criação)
-  const groupedWashes = useMemo(() => {
-    const groups = {};
-    washes.forEach((w) => {
-      const rawDate =
-        w.serviceDate ||
-        (w.date ? w.date.substring(0, 10) : '') ||
-        (w.createdAt ? w.createdAt.substring(0, 10) : 'Sem Data');
+  // Agrupamento por Semana (Semana 1 e 2) e Dias em ordem CRESCENTE (segunda 23, terça 24...)
+  const weekGroups = useMemo(() => groupWashesByWeekAndDay(washes), [washes]);
 
-      if (!groups[rawDate]) {
-        groups[rawDate] = [];
-      }
-      groups[rawDate].push(w);
+  // Vales em ordem CRESCENTE
+  const sortedAdvancesAsc = useMemo(() => {
+    return [...advances].sort((a, b) => {
+      const dateA = a.advanceDate || a.createdAt || '';
+      const dateB = b.advanceDate || b.createdAt || '';
+      return dateA.localeCompare(dateB);
     });
+  }, [advances]);
 
-    const sortedDates = Object.keys(groups).sort((a, b) => {
-      if (a === 'Sem Data') return 1;
-      if (b === 'Sem Data') return -1;
-      return b.localeCompare(a); // Mais recente no topo
+  // Lavagens da visão detalhada em ordem CRESCENTE
+  const sortedWashesAsc = useMemo(() => {
+    return [...washes].sort((a, b) => {
+      const dateA = a.serviceDate || a.date || a.createdAt || '';
+      const dateB = b.serviceDate || b.date || b.createdAt || '';
+      return dateA.localeCompare(dateB);
     });
-
-    return sortedDates.map((dateKey) => ({
-      date: dateKey,
-      washes: groups[dateKey],
-      totalValue: groups[dateKey].reduce((sum, item) => sum + (Number(item.totalValue) || 0), 0),
-    }));
   }, [washes]);
 
   const handleCopyDayList = (group) => {
     const header = group.date === 'Sem Data' ? 'Serviços' : formatDayHeader(group.date);
     const lines = group.washes.map((w) => {
-      const acronyms = w.employeeAcronyms && w.employeeAcronyms.length > 0 ? w.employeeAcronyms.join(', ') : 'SEM SIGLA';
+      const acronyms =
+        w.employeeAcronyms && w.employeeAcronyms.length > 0 ? w.employeeAcronyms.join(', ') : 'SEM SIGLA';
       return `${w.totalValue} - ${acronyms}`;
     });
     const text = `${header}\n${lines.join('\n')}\nTotal: ${formatCurrency(group.totalValue)}`;
@@ -145,10 +140,10 @@ export function EntriesList({
         </button>
       </div>
 
-      {/* 1. ABA: LISTA DE SERVIÇOS POR DIA (Ex: Segunda-Feira 350 - CL, PA) */}
+      {/* 1. ABA: LISTA DE SERVIÇOS POR SEMANA E DIA EM ORDEM CRESCENTE */}
       {activeTab === 'by_day' && (
         <div>
-          {groupedWashes.length === 0 ? (
+          {weekGroups.length === 0 ? (
             <div className="card" style={{ textAlign: 'center', padding: '40px 20px' }}>
               <img
                 src="/icons/empty-truck.png"
@@ -161,200 +156,252 @@ export function EntriesList({
               </p>
             </div>
           ) : (
-            groupedWashes.map((group) => {
-              const headerTitle =
-                group.date === 'Sem Data' ? 'Data Não Informada' : formatDayHeader(group.date);
-
-              return (
-                <div key={group.date} style={{ marginBottom: 20 }}>
-                  {/* Cabeçalho do Dia */}
-                  <div
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      padding: '12px 14px',
-                      backgroundColor: '#151f32',
-                      borderRadius: '12px 12px 0 0',
-                      border: '1px solid #24334d',
-                      borderBottom: '2px solid #10b981',
-                    }}
-                  >
-                    <div>
-                      <div
-                        style={{
-                          fontSize: '0.98rem',
-                          fontWeight: 900,
-                          color: '#34d399',
-                          letterSpacing: '-0.01em',
-                          textTransform: 'uppercase',
-                        }}
-                      >
-                        {headerTitle}
-                      </div>
-                      <div style={{ fontSize: '0.74rem', color: '#94a3b8', marginTop: 2 }}>
-                        {group.washes.length} {group.washes.length === 1 ? 'serviço' : 'serviços'} • Subtotal:{' '}
-                        <strong style={{ color: '#ffffff' }}>{formatCurrency(group.totalValue)}</strong>
-                      </div>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => handleCopyDayList(group)}
-                      title="Copiar lista deste dia"
+            weekGroups.map((week) => (
+              <div key={week.id} style={{ marginBottom: 26 }}>
+                {/* Destaque / Divisor da Semana (Semana 1 e Semana 2) */}
+                <div
+                  style={{
+                    background:
+                      week.id === 'semana_1'
+                        ? 'linear-gradient(135deg, #0c2d48 0%, #143e66 100%)'
+                        : 'linear-gradient(135deg, #1e1b4b 0%, #312e81 100%)',
+                    border: week.id === 'semana_1' ? '2px solid #38bdf8' : '2px solid #818cf8',
+                    borderRadius: 14,
+                    padding: '12px 16px',
+                    marginBottom: 12,
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    boxShadow: '0 4px 14px rgba(0,0,0,0.3)',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <span
                       style={{
-                        backgroundColor: '#1e293b',
-                        color: copiedDate === group.date ? '#34d399' : '#cbd5e1',
-                        border: '1px solid #334155',
+                        backgroundColor: week.id === 'semana_1' ? '#0284c7' : '#4f46e5',
+                        color: '#ffffff',
+                        padding: '4px 10px',
                         borderRadius: 8,
-                        padding: '6px 10px',
-                        fontSize: '0.74rem',
-                        fontWeight: 700,
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 6,
+                        fontWeight: 900,
+                        fontSize: '0.84rem',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.04em',
                       }}
                     >
-                      {copiedDate === group.date ? <Check size={14} color="#34d399" /> : <Copy size={14} />}
-                      <span>{copiedDate === group.date ? 'Copiado!' : 'Copiar'}</span>
-                    </button>
+                      {week.label}
+                    </span>
+                    <span style={{ fontSize: '0.8rem', color: '#cbd5e1', fontWeight: 700 }}>
+                      {week.washCount} {week.washCount === 1 ? 'caminhão' : 'caminhões'}
+                    </span>
                   </div>
 
-                  {/* Lista de Serviços do Dia */}
-                  <div
-                    style={{
-                      backgroundColor: '#0b1120',
-                      border: '1px solid #24334d',
-                      borderTop: 'none',
-                      borderRadius: '0 0 12px 12px',
-                      padding: '10px 10px 4px 10px',
-                    }}
-                  >
-                    {group.washes.map((w) => {
-                      const acronymsList =
-                        w.employeeAcronyms && w.employeeAcronyms.length > 0
-                          ? w.employeeAcronyms.join(', ')
-                          : 'SEM SIGLA';
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: '0.7rem', color: '#cbd5e1', textTransform: 'uppercase', fontWeight: 700 }}>
+                      Subtotal {week.label}
+                    </div>
+                    <div style={{ fontSize: '1.25rem', fontWeight: 900, color: '#ffffff' }}>
+                      {formatCurrency(week.totalValue)}
+                    </div>
+                  </div>
+                </div>
 
-                      return (
-                        <div
-                          key={w.id}
+                {/* Dias da Semana em Ordem CRESCENTE (segunda 23, terça 24...) */}
+                {week.days.map((group) => {
+                  const headerTitle =
+                    group.date === 'Sem Data' ? 'Data Não Informada' : formatDayHeader(group.date);
+
+                  return (
+                    <div key={group.date} style={{ marginBottom: 16 }}>
+                      {/* Cabeçalho do Dia */}
+                      <div
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          padding: '12px 14px',
+                          backgroundColor: '#151f32',
+                          borderRadius: '12px 12px 0 0',
+                          border: '1px solid #24334d',
+                          borderBottom: '2px solid #10b981',
+                        }}
+                      >
+                        <div>
+                          <div
+                            style={{
+                              fontSize: '0.98rem',
+                              fontWeight: 900,
+                              color: '#34d399',
+                              letterSpacing: '-0.01em',
+                              textTransform: 'uppercase',
+                            }}
+                          >
+                            📅 {headerTitle}
+                          </div>
+                          <div style={{ fontSize: '0.74rem', color: '#94a3b8', marginTop: 2 }}>
+                            {group.washes.length} {group.washes.length === 1 ? 'serviço' : 'serviços'} • Subtotal:{' '}
+                            <strong style={{ color: '#ffffff' }}>{formatCurrency(group.totalValue)}</strong>
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => handleCopyDayList(group)}
+                          title="Copiar lista deste dia"
                           style={{
+                            backgroundColor: '#1e293b',
+                            color: copiedDate === group.date ? '#34d399' : '#cbd5e1',
+                            border: '1px solid #334155',
+                            borderRadius: 8,
+                            padding: '6px 10px',
+                            fontSize: '0.74rem',
+                            fontWeight: 700,
+                            cursor: 'pointer',
                             display: 'flex',
                             alignItems: 'center',
-                            justifyContent: 'space-between',
-                            padding: '10px 12px',
-                            backgroundColor: '#131d2e',
-                            borderRadius: '10px',
-                            border: '1px solid #1e293b',
-                            marginBottom: 8,
+                            gap: 6,
                           }}
                         >
-                          <div style={{ flex: 1, minWidth: 0, paddingRight: 8 }}>
-                            {/* Formato Exato: 350 - SIGLAS Separadas por virgulas (CL, PA) */}
-                            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
-                              <span
-                                style={{
-                                  fontSize: '1.25rem',
-                                  fontWeight: 900,
-                                  color: '#34d399',
-                                  letterSpacing: '-0.02em',
-                                }}
-                              >
-                                {w.totalValue}
-                              </span>
-                              <span style={{ color: '#64748b', fontWeight: 800 }}>—</span>
-                              <span
-                                style={{
-                                  fontSize: '1.05rem',
-                                  fontWeight: 800,
-                                  color: '#f8fafc',
-                                  letterSpacing: '0.02em',
-                                }}
-                              >
-                                {acronymsList}
-                              </span>
-                            </div>
+                          {copiedDate === group.date ? <Check size={14} color="#34d399" /> : <Copy size={14} />}
+                          <span>{copiedDate === group.date ? 'Copiado!' : 'Copiar'}</span>
+                        </button>
+                      </div>
 
-                            {/* Informações adicionais discretas */}
+                      {/* Lista de Serviços do Dia */}
+                      <div
+                        style={{
+                          backgroundColor: '#0b1120',
+                          border: '1px solid #24334d',
+                          borderTop: 'none',
+                          borderRadius: '0 0 12px 12px',
+                          padding: '10px 10px 4px 10px',
+                        }}
+                      >
+                        {group.washes.map((w) => {
+                          const acronymsList =
+                            w.employeeAcronyms && w.employeeAcronyms.length > 0
+                              ? w.employeeAcronyms.join(', ')
+                              : 'SEM SIGLA';
+
+                          return (
                             <div
+                              key={w.id}
                               style={{
                                 display: 'flex',
                                 alignItems: 'center',
-                                gap: 6,
-                                marginTop: 4,
-                                fontSize: '0.72rem',
-                                color: '#94a3b8',
-                                flexWrap: 'wrap',
+                                justifyContent: 'space-between',
+                                padding: '10px 12px',
+                                backgroundColor: '#131d2e',
+                                borderRadius: '10px',
+                                border: '1px solid #1e293b',
+                                marginBottom: 8,
                               }}
                             >
-                              {w.plate && (
-                                <span
+                              <div style={{ flex: 1, minWidth: 0, paddingRight: 8 }}>
+                                {/* Formato Solicitado: 350 — SIGLAS (CL, PA, JO) */}
+                                <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
+                                  <span
+                                    style={{
+                                      fontSize: '1.25rem',
+                                      fontWeight: 900,
+                                      color: '#34d399',
+                                      letterSpacing: '-0.02em',
+                                    }}
+                                  >
+                                    {w.totalValue}
+                                  </span>
+                                  <span style={{ color: '#64748b', fontWeight: 800 }}>—</span>
+                                  <span
+                                    style={{
+                                      fontSize: '1.05rem',
+                                      fontWeight: 800,
+                                      color: '#f8fafc',
+                                      letterSpacing: '0.02em',
+                                    }}
+                                  >
+                                    {acronymsList}
+                                  </span>
+                                </div>
+
+                                {/* Informações adicionais discretas */}
+                                <div
                                   style={{
-                                    backgroundColor: '#1e293b',
-                                    color: '#38bdf8',
-                                    fontWeight: 700,
-                                    padding: '1px 5px',
-                                    borderRadius: 4,
-                                    fontSize: '0.7rem',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 6,
+                                    marginTop: 4,
+                                    fontSize: '0.72rem',
+                                    color: '#94a3b8',
+                                    flexWrap: 'wrap',
                                   }}
                                 >
-                                  {w.plate}
-                                </span>
-                              )}
-                              {w.company && <span>{w.company}</span>}
-                              <span style={{ color: '#64748b' }}>•</span>
-                              <span style={{ textTransform: 'uppercase' }}>{w.paymentMethod}</span>
-                              <span style={{ color: '#64748b' }}>•</span>
-                              <span style={{ color: '#a7f3d0' }}>
-                                {formatCurrency(w.valuePerEmployee)} / lavador
-                              </span>
-                            </div>
-                          </div>
+                                  {w.plate && (
+                                    <span
+                                      style={{
+                                        backgroundColor: '#1e293b',
+                                        color: '#38bdf8',
+                                        fontWeight: 700,
+                                        padding: '1px 5px',
+                                        borderRadius: 4,
+                                        fontSize: '0.7rem',
+                                      }}
+                                    >
+                                      {w.plate}
+                                    </span>
+                                  )}
+                                  {w.company && <span>{w.company}</span>}
+                                  <span style={{ color: '#64748b' }}>•</span>
+                                  <span style={{ textTransform: 'uppercase' }}>{w.paymentMethod}</span>
+                                  <span style={{ color: '#64748b' }}>•</span>
+                                  <span style={{ color: '#a7f3d0' }}>
+                                    {formatCurrency(w.valuePerEmployee)} / lavador
+                                  </span>
+                                </div>
+                              </div>
 
-                          {/* Ações: Editar e Excluir */}
-                          <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                            <button
-                              type="button"
-                              className="action-btn"
-                              title="Editar"
-                              onClick={() => onEditWash(w)}
-                            >
-                              <Edit2 size={14} />
-                            </button>
-                            <button
-                              type="button"
-                              className="action-btn delete"
-                              title="Excluir"
-                              onClick={() => {
-                                if (
-                                  confirm(
-                                    `Deseja excluir a lavagem de R$ ${w.totalValue} (${w.plate || 'sem placa'})?`
-                                  )
-                                ) {
-                                  onDeleteWash(w.id);
-                                }
-                              }}
-                            >
-                              <Trash2 size={14} color="#f87171" />
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })
+                              {/* Ações: Editar e Excluir */}
+                              <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                                <button
+                                  type="button"
+                                  className="action-btn"
+                                  title="Editar"
+                                  onClick={() => onEditWash(w)}
+                                >
+                                  <Edit2 size={14} />
+                                </button>
+                                <button
+                                  type="button"
+                                  className="action-btn delete"
+                                  title="Excluir"
+                                  onClick={() => {
+                                    if (
+                                      confirm(
+                                        `Deseja excluir a lavagem de R$ ${w.totalValue} (${w.plate || 'sem placa'})?`
+                                      )
+                                    ) {
+                                      onDeleteWash(w.id);
+                                    }
+                                  }}
+                                >
+                                  <Trash2 size={14} color="#f87171" />
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ))
           )}
         </div>
       )}
 
-      {/* 2. ABA: VISÃO DETALHADA EM CARDS */}
+      {/* 2. ABA: VISÃO DETALHADA EM CARDS (Ordenada em ordem crescente) */}
       {activeTab === 'washes' && (
         <div>
-          {washes.length === 0 ? (
+          {sortedWashesAsc.length === 0 ? (
             <div className="card" style={{ textAlign: 'center', padding: '40px 20px' }}>
               <img
                 src="/icons/empty-truck.png"
@@ -367,7 +414,7 @@ export function EntriesList({
               </p>
             </div>
           ) : (
-            washes.map((w) => (
+            sortedWashesAsc.map((w) => (
               <div key={w.id} className="entry-card">
                 <div style={{ flex: 1, overflow: 'hidden' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -437,10 +484,10 @@ export function EntriesList({
         </div>
       )}
 
-      {/* 3. ABA: LISTA DE VALES */}
+      {/* 3. ABA: LISTA DE VALES (Ordenada em ordem crescente) */}
       {activeTab === 'advances' && (
         <div>
-          {advances.length === 0 ? (
+          {sortedAdvancesAsc.length === 0 ? (
             <div className="card" style={{ textAlign: 'center', padding: '40px 20px' }}>
               <img
                 src="/icons/nav-advance.png"
@@ -453,7 +500,7 @@ export function EntriesList({
               </p>
             </div>
           ) : (
-            advances.map((adv) => (
+            sortedAdvancesAsc.map((adv) => (
               <div key={adv.id} className="entry-card">
                 <div style={{ flex: 1 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>

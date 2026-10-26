@@ -1,0 +1,240 @@
+{
+  "settings": [
+    {
+      "key": "current_quinzena_id",
+      "value": "q_1792849176824_7610n"
+    }
+  ],
+  "employees": [
+    {
+      "id": "emp_1792852542362_0wd5t",
+      "name": "Luis Felipe",
+      "acronym": "LU",
+      "active": 1
+    },
+    {
+      "id": "emp_1792974013701_wrvpv",
+      "name": "Marcos Silva",
+      "acronym": "MC",
+      "active": 1
+    },
+    {
+      "id": "emp_1792975217274_p8ytd",
+      "name": "Claudio Lavador",
+      "acronym": "CL",
+      "active": 1
+    }
+  ],
+  "washes": [
+    {
+      "id": "wash_1792974013746_fk6qm",
+      "quinzena_id": "q_1792849176824_7610n",
+      "created_at": "2026-10-26T00:20:13.746Z",
+      "plate": "ABC-7788",
+      "company": "Transportes Brasil",
+      "payment_method": "pix",
+      "total_value": 350,
+      "product_fee": 10,
+      "base_value": 340,
+      "house_value": 170,
+      "team_value": 170,
+      "employee_ids": "[\"emp_1792974013701_wrvpv\"]",
+      "employee_acronyms": "[\"MC\"]",
+      "value_per_employee": 170,
+      "service_date": "2026-10-26"
+    },
+    {
+      "id": "wash_1792974031708_3ef3h",
+      "quinzena_id": "q_1792849176824_7610n",
+      "created_at": "2026-10-26T00:20:31.708Z",
+      "plate": "ABC-7788",
+      "company": "Transportes Brasil",
+      "payment_method": "pix",
+      "total_value": 350,
+      "product_fee": 10,
+      "base_value": 340,
+      "house_value": 170,
+      "team_value": 170,
+      "employee_ids": "[null]",
+      "employee_acronyms": "[\"MC\"]",
+      "value_per_employee": 170,
+      "service_date": "2026-10-26"
+    },
+    {
+      "id": "wash_1792974142621_wc94g",
+      "quinzena_id": "q_1792849176824_7610n",
+      "created_at": "2026-10-26T00:22:22.621Z",
+      "plate": "ABC-7788",
+      "company": "Transportes Brasil",
+      "payment_method": "pix",
+      "total_value": 350,
+      "product_fee": 10,
+      "base_value": 340,
+      "house_value": 170,
+      "team_value": 170,
+      "employee_ids": "[\"emp_1792852542362_0wd5t\"]",
+      "employee_acronyms": "[\"LU\"]",
+      "value_per_employee": 170,
+      "service_date": "2026-10-26"
+    },
+    {
+      "id": "wash_1792975217359_6vhrl",
+      "quinzena_id": "q_1792849176824_7610n",
+      "created_at": "2026-10-26T00:40:17.359Z",
+      "plate": "TRUCK-9900",
+      "company": "Logística Central",
+      "payment_method": "pix",
+      "total_value": 350,
+      "product_fee": 10,
+      "base_value": 340,
+      "house_value": 170,
+      "team_value": 170,
+      "employee_ids": "[\"emp_1792975217274_p8ytd\"]",
+      "employee_acronyms": "[\"CL\"]",
+      "value_per_employee": 170,
+      "service_date": "2026-10-26"
+    },
+    {
+      "id": "wash_1792975217360_id9il",
+      "quinzena_id": "q_1792849176824_7610n",
+      "created_at": "2026-10-26T00:40:17.360Z",
+      "plate": "OUTRO-1122",
+      "company": "Outro Cliente",
+      "payment_method": "dinheiro",
+      "total_value": 250,
+      "product_fee": 10,
+      "base_value": 240,
+      "house_value": 120,
+      "team_value": 120,
+      "employee_ids": "[\"emp_outro\"]",
+      "employee_acronyms": "[\"PA\"]",
+      "value_per_employee": 120,
+      "service_date": "2026-10-26"
+    }
+  ],
+  "advances": [
+    {
+      "id": "adv_1792852566811_r1s7s",
+      "quinzena_id": "q_1792849176824_7610n",
+      "created_at": "2026-10-24T14:36:06.811Z",
+      "employee_id": "emp_1792852542362_0wd5t",
+      "employee_acronym": "LU",
+      "employee_name": "Luis Felipe",
+      "value": 80,
+      "note": "Vale",
+      "advance_date": null
+    },
+    {
+      "id": "adv_1792974013748_35cbi",
+      "quinzena_id": "q_1792849176824_7610n",
+      "created_at": "2026-10-26T00:20:13.748Z",
+      "employee_id": "emp_1792974013701_wrvpv",
+      "employee_acronym": "MC",
+      "employee_name": "Marcos Silva",
+      "value": 50,
+      "note": "Almoço na rodovia",
+      "advance_date": "2026-10-26"
+    },
+    {
+      "id": "adv_1792974142622_47js1",
+      "quinzena_id": "q_1792849176824_7610n",
+      "created_at": "2026-10-26T00:22:22.622Z",
+      "employee_id": "emp_1792852542362_0wd5t",
+      "employee_acronym": "LU",
+      "employee_name": "Luis Felipe",
+      "value": 50,
+      "note": "Almoço na rodovia",
+      "advance_date": "2026-10-26"
+    }
+  ],
+  "closed_quinzenas": [],
+  "users": [
+    {
+      "id": "usr_drluis",
+      "username": "drluis22",
+      "password_hash": "2188b860b24a146d512e349f11baa69a843d2b99b6d9578dc3a65711a5f705d9a7b09c5489087f19c9e997c5675cfb2a4cfedaffef053f38ad6d5cdae3620daf",
+      "salt": "3a04d3ef04ee852cf26328f81413aaca",
+      "name": "Dr. Luis",
+      "role": "ceo",
+      "employee_id": null,
+      "created_at": "2026-10-25T15:39:59.915Z"
+    },
+    {
+      "id": "usr_1792974013745_ejcr2",
+      "username": "marcos_mvoifn5y",
+      "password_hash": "47eb7bbc6cb4d17a5e70b35ce8157fc39ea14d3ee89105bd0eb7d2baa6404205a5c3ebdf8106c319bafe4a7f90ee182ee8cc4d08fa2e666914553e0163ec81a9",
+      "salt": "6613b0c3c2143919f268be7fdcddb3c6",
+      "name": "Marcos Silva",
+      "role": "funcionario",
+      "employee_id": "emp_1792974013701_wrvpv",
+      "created_at": "2026-10-26T00:20:13.745Z"
+    },
+    {
+      "id": "usr_1792974031706_ezfv1",
+      "username": "marcos_mvoig112",
+      "password_hash": "02d71fcef1019aeece15336ec3283ac7af580a68caf1ecc09b5c05817996e7fa989481ad33be9ed329509f69b99bf119b70810ce499c1f2e878cff22d677c701",
+      "salt": "e591d020b633e01412b086193abbbec4",
+      "name": "Marcos Silva",
+      "role": "funcionario",
+      "employee_id": null,
+      "created_at": "2026-10-26T00:20:31.706Z"
+    },
+    {
+      "id": "usr_1792974142619_gfoaa",
+      "username": "func_mvoiielw",
+      "password_hash": "4581dd892cdfcfa675ddfced5f555936efce8bf70c22363c1682d019542aa75500cc73eb782acc1d285dfbcc36ecac3f7b7d87d24a30fbec7736b6eb5952b0e5",
+      "salt": "d9c9f7edcc49918392ee0f6156d36330",
+      "name": "Luis Felipe",
+      "role": "funcionario",
+      "employee_id": "emp_1792852542362_0wd5t",
+      "created_at": "2026-10-26T00:22:22.619Z"
+    },
+    {
+      "id": "usr_1792975217312_oxxoz",
+      "username": "claudio_mvoj5fuj",
+      "password_hash": "5fb39288cd9411c3b9b14a714be81e0e2a961a2a5b39165b8c30a917cc54b84c636668fbb67ba0a0d8680e7c0ddbabe63419a01a84c3460b4f20cebbaee289db",
+      "salt": "e66786b3901f411ce42bce61618af52a",
+      "name": "Claudio Lavador",
+      "role": "funcionario",
+      "employee_id": "emp_1792975217274_p8ytd",
+      "created_at": "2026-10-26T00:40:17.312Z"
+    }
+  ],
+  "sessions": [
+    {
+      "token": "4dad15ab52d57fd98e920c6d4dd4e137fcc643955bb2b86c61663039e8f66218",
+      "user_id": "usr_drluis",
+      "created_at": "2026-10-25T15:40:24.717Z"
+    },
+    {
+      "token": "a2ca12f0c76746ca68b008869ffa2672aadcdb452a43805d41a3d5358868d51c",
+      "user_id": "usr_drluis",
+      "created_at": "2026-10-26T00:20:13.694Z"
+    },
+    {
+      "token": "2711c9d504d2c34f3166514c61357037f9b9cd004d7ce825044cf4a6ff73f841",
+      "user_id": "usr_drluis",
+      "created_at": "2026-10-26T00:20:31.663Z"
+    },
+    {
+      "token": "fc45c13e725bca7293b8f59030f64e7cdb9171c240353c61154260dd3fa39f47",
+      "user_id": "usr_drluis",
+      "created_at": "2026-10-26T00:22:22.571Z"
+    },
+    {
+      "token": "c35f6c2bc9b8bc73ddc08b3142ec25c4a328a22515e0d86834c3b7b3f2234f30",
+      "user_id": "usr_1792974142619_gfoaa",
+      "created_at": "2026-10-26T00:22:22.661Z"
+    },
+    {
+      "token": "4290be44ed1bf0e2bc59b2109cb24d35d33a09247f42b6475a7a6a91fff14883",
+      "user_id": "usr_drluis",
+      "created_at": "2026-10-26T00:40:17.263Z"
+    },
+    {
+      "token": "a0da407201fd4c717f22fbc8d6ae7e92659b70390054d399bf7770da5c946fa3",
+      "user_id": "usr_1792975217312_oxxoz",
+      "created_at": "2026-10-26T00:40:17.356Z"
+    }
+  ]
+}

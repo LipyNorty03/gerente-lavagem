@@ -186,14 +186,58 @@ export async function initDatabase() {
     await execute('INSERT INTO settings (key, value) VALUES (?, ?)', ['current_quinzena_id', initialQId]);
   }
 
-  // Inicializa funcionários padrão se tabela estiver vazia
+  // Inicializa a partir de backup salvo ou padrão
   const empCountRow = await queryOne('SELECT COUNT(*) as count FROM employees');
   const empCount = Number(empCountRow?.count || 0);
   if (empCount === 0) {
-    await execute('INSERT INTO employees (id, name, acronym, active) VALUES (?, ?, ?, ?)', ['emp_1', 'Carlos Silva', 'CS', 1]);
-    await execute('INSERT INTO employees (id, name, acronym, active) VALUES (?, ?, ?, ?)', ['emp_2', 'João Santos', 'JO', 1]);
-    await execute('INSERT INTO employees (id, name, acronym, active) VALUES (?, ?, ?, ?)', ['emp_3', 'Marcelo Andrade', 'MA', 1]);
-    await execute('INSERT INTO employees (id, name, acronym, active) VALUES (?, ?, ?, ?)', ['emp_4', 'Roberto Lima', 'RL', 1]);
+    const seedPath = path.join(__dirname, 'initial_seed.json');
+    if (fs.existsSync(seedPath)) {
+      try {
+        const seedData = JSON.parse(fs.readFileSync(seedPath, 'utf-8'));
+        if (Array.isArray(seedData.employees)) {
+          for (const emp of seedData.employees) {
+            await execute('INSERT INTO employees (id, name, acronym, active) VALUES (?, ?, ?, ?) ON CONFLICT (id) DO NOTHING', [emp.id, emp.name, emp.acronym, emp.active]);
+          }
+        }
+        if (Array.isArray(seedData.settings)) {
+          for (const s of seedData.settings) {
+            await execute('INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value', [s.key, s.value]);
+          }
+        }
+        if (Array.isArray(seedData.washes)) {
+          for (const w of seedData.washes) {
+            await execute(`INSERT INTO washes (id, quinzena_id, created_at, service_date, plate, company, payment_method, total_value, product_fee, base_value, house_value, team_value, employee_ids, employee_acronyms, value_per_employee)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT (id) DO NOTHING`,
+              [w.id, w.quinzena_id, w.created_at, w.service_date, w.plate, w.company, w.payment_method, w.total_value, w.product_fee, w.base_value, w.house_value, w.team_value, w.employee_ids, w.employee_acronyms, w.value_per_employee]
+            );
+          }
+        }
+        if (Array.isArray(seedData.advances)) {
+          for (const a of seedData.advances) {
+            await execute(`INSERT INTO advances (id, quinzena_id, created_at, advance_date, employee_id, employee_acronym, employee_name, value, note)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT (id) DO NOTHING`,
+              [a.id, a.quinzena_id, a.created_at, a.advance_date, a.employee_id, a.employee_acronym, a.employee_name, a.value, a.note]
+            );
+          }
+        }
+        if (Array.isArray(seedData.users)) {
+          for (const u of seedData.users) {
+            await execute(`INSERT INTO users (id, username, password_hash, salt, name, role, employee_id, created_at)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT (username) DO NOTHING`,
+              [u.id, u.username, u.password_hash, u.salt, u.name, u.role, u.employee_id, u.created_at]
+            );
+          }
+        }
+        console.log('[Banco Online] Dados de backup restaurados com sucesso no novo banco!');
+      } catch (err) {
+        console.error('[Banco Online] Falha ao carregar initial_seed.json:', err.message);
+      }
+    } else {
+      await execute('INSERT INTO employees (id, name, acronym, active) VALUES (?, ?, ?, ?)', ['emp_1', 'Carlos Silva', 'CS', 1]);
+      await execute('INSERT INTO employees (id, name, acronym, active) VALUES (?, ?, ?, ?)', ['emp_2', 'João Santos', 'JO', 1]);
+      await execute('INSERT INTO employees (id, name, acronym, active) VALUES (?, ?, ?, ?)', ['emp_3', 'Marcelo Andrade', 'MA', 1]);
+      await execute('INSERT INTO employees (id, name, acronym, active) VALUES (?, ?, ?, ?)', ['emp_4', 'Roberto Lima', 'RL', 1]);
+    }
   }
 
   // Remove logins de teste antigos

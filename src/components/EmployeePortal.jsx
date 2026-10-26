@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Truck, DollarSign, LogOut, RefreshCw, Calendar, CheckCircle2 } from 'lucide-react';
 import { fetchMyPortalData, apiLogout } from '../services/api';
-import { formatCurrency, formatDateTime } from '../services/calculations';
+import { formatCurrency, formatDateTime, formatDayHeader } from '../services/calculations';
 
 export function EmployeePortal({ user, onLogout }) {
   const [data, setData] = useState(null);
@@ -200,7 +200,7 @@ export function EmployeePortal({ user, onLogout }) {
                     </div>
                     <div className="entry-company">{w.company || 'Cliente Avulso'}</div>
                     <div style={{ fontSize: '0.74rem', color: '#94a3b8', marginTop: 4 }}>
-                      {formatDateTime(w.createdAt)}
+                      {w.serviceDate ? `📅 ${formatDayHeader(w.serviceDate)}` : formatDateTime(w.createdAt)}
                     </div>
                   </div>
 
@@ -237,7 +237,7 @@ export function EmployeePortal({ user, onLogout }) {
                       {adv.note || 'Vale / Adiantamento'}
                     </div>
                     <div style={{ fontSize: '0.74rem', color: '#94a3b8', marginTop: 4 }}>
-                      {formatDateTime(adv.createdAt)}
+                      {adv.advanceDate ? `📅 ${formatDayHeader(adv.advanceDate)}` : formatDateTime(adv.createdAt)}
                     </div>
                   </div>
 

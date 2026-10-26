@@ -3,7 +3,17 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { db, getCurrentQuinzenaId, setNextQuinzenaId, hashPassword, verifyPassword } from './db.js';
+import {
+  query,
+  queryOne,
+  execute,
+  getCurrentQuinzenaId,
+  setNextQuinzenaId,
+  hashPassword,
+  verifyPassword,
+  initDatabase,
+  isPostgres,
+} from './db.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -85,21 +95,20 @@ function parseJsonBody(req) {
 }
 
 // Extrai o usuário da sessão a partir do cabeçalho Authorization
-function getAuthenticatedUser(req) {
+async function getAuthenticatedUser(req) {
   const authHeader = req.headers['authorization'];
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return null;
   }
   const token = authHeader.substring(7).trim();
-  const sessionRow = db.prepare(`
-    SELECT s.token, u.id, u.username, u.name, u.role, u.employee_id as employeeId, e.acronym as employeeAcronym
-    FROM sessions s
-    JOIN users u ON s.user_id = u.id
-    LEFT JOIN employees e ON u.employee_id = e.id
-    WHERE s.token = ?
-  `).get(token);
-
-  return sessionRow || null;
+  return await queryOne(
+    `SELECT s.token, u.id, u.username, u.name, u.role, u.employee_id as "employeeId", e.acronym as "employeeAcronym"
+     FROM sessions s
+     JOIN users u ON s.user_id = u.id
+     LEFT JOIN employees e ON u.employee_id = e.id
+     WHERE s.token = ?`,
+    [token]
+  );
 }
 
 const server = http.createServer(async (req, res) => {
@@ -116,7 +125,7 @@ const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
   const pathname = url.pathname;
 
-  // Servir arquivos estáticos do frontend PWA de produção (HTML, CSS, JS, Manifest, Service Worker)
+  // Servir arquivos estáticos do frontend PWA de produção
   if (!pathname.startsWith('/api')) {
     return serveStaticFile(req, res, pathname);
   }
@@ -124,10 +133,11 @@ const server = http.createServer(async (req, res) => {
   try {
     // 1. Status / Health Check
     if (pathname === '/api/status' && req.method === 'GET') {
+      const currentQId = await getCurrentQuinzenaId();
       return sendJson(res, 200, {
         status: 'online',
-        database: 'SQLite (Node native)',
-        currentQuinzenaId: getCurrentQuinzenaId(),
+        database: isPostgres ? 'PostgreSQL (Cloud Database)' : 'SQLite (Node native)',
+        currentQuinzenaId: currentQId,
         timestamp: new Date().toISOString(),
       });
     }
@@ -139,12 +149,13 @@ const server = http.createServer(async (req, res) => {
         return sendJson(res, 400, { error: 'Informe usuário e senha.' });
       }
 
-      const user = db.prepare(`
-        SELECT u.id, u.username, u.password_hash, u.salt, u.name, u.role, u.employee_id as employeeId, e.acronym as employeeAcronym
-        FROM users u
-        LEFT JOIN employees e ON u.employee_id = e.id
-        WHERE LOWER(u.username) = LOWER(?)
-      `).get(username.trim());
+      const user = await queryOne(
+        `SELECT u.id, u.username, u.password_hash, u.salt, u.name, u.role, u.employee_id as "employeeId", e.acronym as "employeeAcronym"
+         FROM users u
+         LEFT JOIN employees e ON u.employee_id = e.id
+         WHERE LOWER(u.username) = LOWER(?)`,
+        [username.trim()]
+      );
 
       if (!user) {
         return sendJson(res, 401, { error: 'Usuário ou senha incorretos.' });
@@ -157,11 +168,11 @@ const server = http.createServer(async (req, res) => {
 
       // Cria token de sessão
       const token = crypto.randomBytes(32).toString('hex');
-      db.prepare('INSERT INTO sessions (token, user_id, created_at) VALUES (?, ?, ?)').run(
+      await execute('INSERT INTO sessions (token, user_id, created_at) VALUES (?, ?, ?)', [
         token,
         user.id,
-        new Date().toISOString()
-      );
+        new Date().toISOString(),
+      ]);
 
       return sendJson(res, 200, {
         token,
@@ -178,7 +189,7 @@ const server = http.createServer(async (req, res) => {
 
     // 3. AUTENTICAÇÃO: ME (PERFIL ATUAL)
     if (pathname === '/api/auth/me' && req.method === 'GET') {
-      const user = getAuthenticatedUser(req);
+      const user = await getAuthenticatedUser(req);
       if (!user) {
         return sendJson(res, 401, { error: 'Não autenticado' });
       }
@@ -190,19 +201,19 @@ const server = http.createServer(async (req, res) => {
       const authHeader = req.headers['authorization'];
       if (authHeader && authHeader.startsWith('Bearer ')) {
         const token = authHeader.substring(7).trim();
-        db.prepare('DELETE FROM sessions WHERE token = ?').run(token);
+        await execute('DELETE FROM sessions WHERE token = ?', [token]);
       }
       return sendJson(res, 200, { success: true });
     }
 
     // 5. PORTAL EXCLUSIVO DO FUNCIONÁRIO (Somente seus dados)
     if (pathname === '/api/my-portal' && req.method === 'GET') {
-      const user = getAuthenticatedUser(req);
+      const user = await getAuthenticatedUser(req);
       if (!user) {
         return sendJson(res, 401, { error: 'Acesso não autorizado' });
       }
 
-      const currentQId = getCurrentQuinzenaId();
+      const currentQId = await getCurrentQuinzenaId();
       const empId = user.employeeId;
 
       if (!empId) {
@@ -214,8 +225,10 @@ const server = http.createServer(async (req, res) => {
         });
       }
 
-      // Busca apenas as lavagens onde este funcionário participou
-      const rawWashes = db.prepare('SELECT * FROM washes WHERE quinzena_id = ? ORDER BY created_at DESC').all(currentQId);
+      const rawWashes = await query(
+        'SELECT * FROM washes WHERE quinzena_id = ? ORDER BY created_at DESC',
+        [currentQId]
+      );
       const myWashes = rawWashes
         .filter((w) => {
           const ids = JSON.parse(w.employee_ids || '[]');
@@ -224,18 +237,29 @@ const server = http.createServer(async (req, res) => {
         .map((w) => ({
           id: w.id,
           createdAt: w.created_at,
+          serviceDate: w.service_date || (w.created_at ? w.created_at.substring(0, 10) : ''),
           plate: w.plate,
           company: w.company,
           paymentMethod: w.payment_method,
-          totalValue: w.total_value,
-          valuePerEmployee: w.value_per_employee,
+          totalValue: Number(w.total_value) || 0,
+          valuePerEmployee: Number(w.value_per_employee) || 0,
         }));
 
-      // Busca apenas os vales deste funcionário
-      const myAdvances = db.prepare('SELECT id, created_at as createdAt, value, note FROM advances WHERE quinzena_id = ? AND employee_id = ? ORDER BY created_at DESC').all(currentQId, empId);
+      const rawMyAdvances = await query(
+        `SELECT id, created_at, advance_date, value, note
+         FROM advances WHERE quinzena_id = ? AND employee_id = ? ORDER BY created_at DESC`,
+        [currentQId, empId]
+      );
+      const myAdvances = rawMyAdvances.map((a) => ({
+        id: a.id,
+        createdAt: a.created_at || a.createdAt,
+        advanceDate: a.advance_date || a.advanceDate || (a.created_at ? a.created_at.substring(0, 10) : ''),
+        value: Number(a.value) || 0,
+        note: a.note,
+      }));
 
       const totalCommission = myWashes.reduce((sum, w) => sum + (w.valuePerEmployee || 0), 0);
-      const totalAdvances = myAdvances.reduce((sum, a) => sum + (a.value || 0), 0);
+      const totalAdvances = myAdvances.reduce((sum, a) => sum + (Number(a.value) || 0), 0);
       const netToPay = Math.max(0, totalCommission - totalAdvances);
 
       return sendJson(res, 200, {
@@ -253,24 +277,24 @@ const server = http.createServer(async (req, res) => {
 
     // 6. GESTÃO DE USUÁRIOS E CARGOS (EXCLUSIVO CEO)
     if (pathname === '/api/users' && req.method === 'GET') {
-      const user = getAuthenticatedUser(req);
+      const user = await getAuthenticatedUser(req);
       if (!user || user.role !== 'ceo') {
         return sendJson(res, 403, { error: 'Acesso exclusivo para o CEO.' });
       }
 
-      const users = db.prepare(`
-        SELECT u.id, u.username, u.name, u.role, u.employee_id as employeeId, u.created_at as createdAt, e.acronym as employeeAcronym
-        FROM users u
-        LEFT JOIN employees e ON u.employee_id = e.id
-        ORDER BY u.role = 'ceo' DESC, u.name ASC
-      `).all();
+      const users = await query(
+        `SELECT u.id, u.username, u.name, u.role, u.employee_id as "employeeId", u.created_at as "createdAt", e.acronym as "employeeAcronym"
+         FROM users u
+         LEFT JOIN employees e ON u.employee_id = e.id
+         ORDER BY (CASE WHEN u.role = 'ceo' THEN 0 ELSE 1 END), u.name ASC`
+      );
 
       return sendJson(res, 200, { users });
     }
 
     // 7. CADASTRAR OU ATUALIZAR USUÁRIO (EXCLUSIVO CEO)
     if (pathname === '/api/users' && req.method === 'POST') {
-      const caller = getAuthenticatedUser(req);
+      const caller = await getAuthenticatedUser(req);
       if (!caller || caller.role !== 'ceo') {
         return sendJson(res, 403, { error: 'Somente o CEO pode cadastrar ou alterar usuários e cargos.' });
       }
@@ -290,15 +314,17 @@ const server = http.createServer(async (req, res) => {
         // Atualização de usuário existente
         if (password && password.trim()) {
           const auth = hashPassword(password.trim());
-          db.prepare(`
-            UPDATE users SET username = ?, password_hash = ?, salt = ?, name = ?, role = ?, employee_id = ?
-            WHERE id = ?
-          `).run(username.trim().toLowerCase(), auth.hash, auth.salt, name.trim(), role, employeeId || null, id);
+          await execute(
+            `UPDATE users SET username = ?, password_hash = ?, salt = ?, name = ?, role = ?, employee_id = ?
+             WHERE id = ?`,
+            [username.trim().toLowerCase(), auth.hash, auth.salt, name.trim(), role, employeeId || null, id]
+          );
         } else {
-          db.prepare(`
-            UPDATE users SET username = ?, name = ?, role = ?, employee_id = ?
-            WHERE id = ?
-          `).run(username.trim().toLowerCase(), name.trim(), role, employeeId || null, id);
+          await execute(
+            `UPDATE users SET username = ?, name = ?, role = ?, employee_id = ?
+             WHERE id = ?`,
+            [username.trim().toLowerCase(), name.trim(), role, employeeId || null, id]
+          );
         }
         return sendJson(res, 200, { success: true, id });
       } else {
@@ -308,19 +334,20 @@ const server = http.createServer(async (req, res) => {
         }
         const auth = hashPassword(password.trim());
         const newId = `usr_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-        
-        db.prepare(`
-          INSERT INTO users (id, username, password_hash, salt, name, role, employee_id, created_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        `).run(
-          newId,
-          username.trim().toLowerCase(),
-          auth.hash,
-          auth.salt,
-          name.trim(),
-          role,
-          employeeId || null,
-          new Date().toISOString()
+
+        await execute(
+          `INSERT INTO users (id, username, password_hash, salt, name, role, employee_id, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            newId,
+            username.trim().toLowerCase(),
+            auth.hash,
+            auth.salt,
+            name.trim(),
+            role,
+            employeeId || null,
+            new Date().toISOString(),
+          ]
         );
 
         return sendJson(res, 201, { success: true, id: newId });
@@ -329,7 +356,7 @@ const server = http.createServer(async (req, res) => {
 
     // 8. EXCLUIR USUÁRIO (EXCLUSIVO CEO)
     if (pathname.startsWith('/api/users/') && req.method === 'DELETE') {
-      const caller = getAuthenticatedUser(req);
+      const caller = await getAuthenticatedUser(req);
       if (!caller || caller.role !== 'ceo') {
         return sendJson(res, 403, { error: 'Somente o CEO pode excluir usuários.' });
       }
@@ -339,51 +366,81 @@ const server = http.createServer(async (req, res) => {
         return sendJson(res, 400, { error: 'O CEO não pode excluir sua própria conta.' });
       }
 
-      db.prepare('DELETE FROM users WHERE id = ?').run(id);
+      await execute('DELETE FROM users WHERE id = ?', [id]);
       return sendJson(res, 200, { success: true, id });
     }
 
     // 9. LEITURA COMPLETA DE DADOS OPERACIONAIS (Gerente e CEO)
     if (pathname === '/api/data' && req.method === 'GET') {
-      const user = getAuthenticatedUser(req);
-      if (user && user.role === 'funcionario') {
+      const user = await getAuthenticatedUser(req);
+      if (!user) {
+        return sendJson(res, 401, { error: 'Faça login para acessar os dados operacionais.' });
+      }
+      if (user.role !== 'ceo' && user.role !== 'gerente') {
         return sendJson(res, 403, { error: 'Funcionários devem usar o portal individual (/api/my-portal).' });
       }
 
-      const currentQId = getCurrentQuinzenaId();
-      const employees = db.prepare('SELECT id, name, acronym, active = 1 as active FROM employees ORDER BY name').all();
-      
-      const rawWashes = db.prepare('SELECT * FROM washes WHERE quinzena_id = ? ORDER BY created_at DESC').all(currentQId);
+      const currentQId = await getCurrentQuinzenaId();
+      const rawEmployees = await query('SELECT id, name, acronym, active FROM employees ORDER BY name');
+      const employees = rawEmployees.map((e) => ({
+        id: e.id,
+        name: e.name,
+        acronym: e.acronym,
+        active: Boolean(e.active === 1 || e.active === true),
+      }));
+
+      const rawWashes = await query(
+        'SELECT * FROM washes WHERE quinzena_id = ? ORDER BY created_at DESC',
+        [currentQId]
+      );
       const washes = rawWashes.map((w) => ({
         id: w.id,
         quinzenaId: w.quinzena_id,
         createdAt: w.created_at,
+        serviceDate: w.service_date || (w.created_at ? w.created_at.substring(0, 10) : ''),
         plate: w.plate,
         company: w.company,
         paymentMethod: w.payment_method,
-        totalValue: w.total_value,
-        productFee: w.product_fee,
-        baseValue: w.base_value,
-        houseValue: w.house_value,
-        teamValue: w.team_value,
+        totalValue: Number(w.total_value) || 0,
+        productFee: Number(w.product_fee) || 0,
+        baseValue: Number(w.base_value) || 0,
+        houseValue: Number(w.house_value) || 0,
+        teamValue: Number(w.team_value) || 0,
         employeeIds: JSON.parse(w.employee_ids || '[]'),
         employeeAcronyms: JSON.parse(w.employee_acronyms || '[]'),
-        valuePerEmployee: w.value_per_employee,
+        valuePerEmployee: Number(w.value_per_employee) || 0,
       }));
 
-      const advances = db.prepare('SELECT id, quinzena_id as quinzenaId, created_at as createdAt, employee_id as employeeId, employee_acronym as employeeAcronym, employee_name as employeeName, value, note FROM advances WHERE quinzena_id = ? ORDER BY created_at DESC').all(currentQId);
+      const rawAdvances = await query(
+        `SELECT id, quinzena_id as "quinzenaId", created_at as "createdAt", advance_date as "advanceDate",
+                employee_id as "employeeId", employee_acronym as "employeeAcronym", employee_name as "employeeName",
+                value, note
+         FROM advances WHERE quinzena_id = ? ORDER BY created_at DESC`,
+        [currentQId]
+      );
+      const advances = rawAdvances.map((a) => ({
+        id: a.id,
+        quinzenaId: a.quinzenaId || a.quinzena_id,
+        createdAt: a.createdAt || a.created_at,
+        advanceDate: a.advanceDate || a.advance_date || (a.createdAt || a.created_at ? (a.createdAt || a.created_at).substring(0, 10) : ''),
+        employeeId: a.employeeId || a.employee_id,
+        employeeAcronym: a.employeeAcronym || a.employee_acronym,
+        employeeName: a.employeeName || a.employee_name,
+        value: Number(a.value) || 0,
+        note: a.note || '',
+      }));
 
-      const rawClosed = db.prepare('SELECT * FROM closed_quinzenas ORDER BY closed_at DESC').all();
+      const rawClosed = await query('SELECT * FROM closed_quinzenas ORDER BY closed_at DESC');
       const closedQuinzenas = rawClosed.map((c) => ({
         id: c.id,
         closedAt: c.closed_at,
-        totalRevenue: c.total_revenue,
-        totalProducts: c.total_products,
-        totalHouse: c.total_house,
-        totalTeam: c.total_team,
-        totalAdvances: c.total_advances,
-        totalNetPayable: c.total_net_payable,
-        washCount: c.wash_count,
+        totalRevenue: Number(c.total_revenue) || 0,
+        totalProducts: Number(c.total_products) || 0,
+        totalHouse: Number(c.total_house) || 0,
+        totalTeam: Number(c.total_team) || 0,
+        totalAdvances: Number(c.total_advances) || 0,
+        totalNetPayable: Number(c.total_net_payable) || 0,
+        washCount: Number(c.wash_count) || 0,
         employeesSummary: JSON.parse(c.employees_summary || '[]'),
       }));
 
@@ -396,25 +453,37 @@ const server = http.createServer(async (req, res) => {
       });
     }
 
-    // 10. OPERAÇÕES DE LANÇAMENTO (Gerente ou CEO)
+    // 10. OPERAÇÕES DE LANÇAMENTO (EXCLUSIVO: GERENTE OU CEO)
     if (pathname === '/api/washes' && req.method === 'POST') {
-      const user = getAuthenticatedUser(req);
-      if (user && user.role === 'funcionario') {
-        return sendJson(res, 403, { error: 'Funcionários não podem lançar lavagens.' });
+      const user = await getAuthenticatedUser(req);
+      if (!user) {
+        return sendJson(res, 401, { error: 'Autenticação necessária. Faça login.' });
+      }
+      if (user.role !== 'ceo' && user.role !== 'gerente') {
+        return sendJson(res, 403, { error: 'Apenas Gerente e CEO podem cadastrar lavagens.' });
       }
 
       const data = await parseJsonBody(req);
-      const currentQId = getCurrentQuinzenaId();
+      const currentQId = await getCurrentQuinzenaId();
       const id = data.id || `wash_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
       const createdAt = data.createdAt || new Date().toISOString();
+      const serviceDate = data.serviceDate || data.date || (createdAt ? createdAt.substring(0, 10) : new Date().toISOString().substring(0, 10));
 
-      const stmt = db.prepare(`
-        INSERT INTO washes (
-          id, quinzena_id, created_at, plate, company, payment_method,
+      const totalVal = Number(data.totalValue) || 0;
+      const prodFee = Number(data.productFee) || 10;
+      const baseVal = Number(data.baseValue) || 0;
+      const houseVal = Number(data.houseValue) || 0;
+      const teamVal = Number(data.teamValue) || 0;
+      const valPerEmp = Number(data.valuePerEmployee) || 0;
+
+      await execute(
+        `INSERT INTO washes (
+          id, quinzena_id, created_at, service_date, plate, company, payment_method,
           total_value, product_fee, base_value, house_value, team_value,
           employee_ids, employee_acronyms, value_per_employee
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(id) DO UPDATE SET
+          service_date = excluded.service_date,
           plate = excluded.plate,
           company = excluded.company,
           payment_method = excluded.payment_method,
@@ -425,37 +494,32 @@ const server = http.createServer(async (req, res) => {
           team_value = excluded.team_value,
           employee_ids = excluded.employee_ids,
           employee_acronyms = excluded.employee_acronyms,
-          value_per_employee = excluded.value_per_employee
-      `);
-
-      const totalVal = Number(data.totalValue) || 0;
-      const prodFee = Number(data.productFee) || 10;
-      const baseVal = Number(data.baseValue) || 0;
-      const houseVal = Number(data.houseValue) || 0;
-      const teamVal = Number(data.teamValue) || 0;
-      const valPerEmp = Number(data.valuePerEmployee) || 0;
-
-      stmt.run(
-        id,
-        currentQId, // Força a quinzena ativa do servidor
-        createdAt,
-        data.plate || '',
-        data.company || '',
-        data.paymentMethod || 'pix',
-        totalVal,
-        prodFee,
-        baseVal,
-        houseVal,
-        teamVal,
-        JSON.stringify(data.employeeIds || []),
-        JSON.stringify(data.employeeAcronyms || []),
-        valPerEmp
+          value_per_employee = excluded.value_per_employee`,
+        [
+          id,
+          currentQId,
+          createdAt,
+          serviceDate,
+          data.plate || '',
+          data.company || '',
+          data.paymentMethod || 'pix',
+          totalVal,
+          prodFee,
+          baseVal,
+          houseVal,
+          teamVal,
+          JSON.stringify(data.employeeIds || []),
+          JSON.stringify(data.employeeAcronyms || []),
+          valPerEmp,
+        ]
       );
 
       const savedWash = {
         id,
         quinzenaId: currentQId,
         createdAt,
+        serviceDate,
+        date: serviceDate,
         plate: data.plate || '',
         company: data.company || '',
         paymentMethod: data.paymentMethod || 'pix',
@@ -473,54 +537,64 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (pathname.startsWith('/api/washes/') && req.method === 'DELETE') {
-      const user = getAuthenticatedUser(req);
-      if (user && user.role === 'funcionario') {
-        return sendJson(res, 403, { error: 'Sem permissão.' });
+      const user = await getAuthenticatedUser(req);
+      if (!user) {
+        return sendJson(res, 401, { error: 'Autenticação necessária.' });
+      }
+      if (user.role !== 'ceo' && user.role !== 'gerente') {
+        return sendJson(res, 403, { error: 'Apenas Gerente e CEO podem excluir lavagens.' });
       }
       const id = pathname.replace('/api/washes/', '');
-      db.prepare('DELETE FROM washes WHERE id = ?').run(id);
+      await execute('DELETE FROM washes WHERE id = ?', [id]);
       return sendJson(res, 200, { success: true, id });
     }
 
+    // 11. VALES / ADIANTAMENTOS (EXCLUSIVO: GERENTE OU CEO)
     if (pathname === '/api/advances' && req.method === 'POST') {
-      const user = getAuthenticatedUser(req);
-      if (user && user.role === 'funcionario') {
-        return sendJson(res, 403, { error: 'Sem permissão.' });
+      const user = await getAuthenticatedUser(req);
+      if (!user) {
+        return sendJson(res, 401, { error: 'Autenticação necessária.' });
+      }
+      if (user.role !== 'ceo' && user.role !== 'gerente') {
+        return sendJson(res, 403, { error: 'Apenas Gerente e CEO podem lançar vales.' });
       }
 
       const data = await parseJsonBody(req);
-      const currentQId = getCurrentQuinzenaId();
+      const currentQId = await getCurrentQuinzenaId();
       const id = data.id || `adv_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
       const createdAt = data.createdAt || new Date().toISOString();
-
-      const stmt = db.prepare(`
-        INSERT INTO advances (id, quinzena_id, created_at, employee_id, employee_acronym, employee_name, value, note)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT(id) DO UPDATE SET
-          employee_id = excluded.employee_id,
-          employee_acronym = excluded.employee_acronym,
-          employee_name = excluded.employee_name,
-          value = excluded.value,
-          note = excluded.note
-      `);
-
+      const advanceDate = data.advanceDate || data.date || (createdAt ? createdAt.substring(0, 10) : new Date().toISOString().substring(0, 10));
       const val = Number(data.value) || 0;
 
-      stmt.run(
-        id,
-        currentQId, // Força a quinzena ativa do servidor
-        createdAt,
-        data.employeeId,
-        data.employeeAcronym || '?',
-        data.employeeName || '',
-        val,
-        data.note || ''
+      await execute(
+        `INSERT INTO advances (id, quinzena_id, created_at, advance_date, employee_id, employee_acronym, employee_name, value, note)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET
+           advance_date = excluded.advance_date,
+           employee_id = excluded.employee_id,
+           employee_acronym = excluded.employee_acronym,
+           employee_name = excluded.employee_name,
+           value = excluded.value,
+           note = excluded.note`,
+        [
+          id,
+          currentQId,
+          createdAt,
+          advanceDate,
+          data.employeeId,
+          data.employeeAcronym || '?',
+          data.employeeName || '',
+          val,
+          data.note || '',
+        ]
       );
 
       const savedAdv = {
         id,
         quinzenaId: currentQId,
         createdAt,
+        advanceDate,
+        date: advanceDate,
         employeeId: data.employeeId,
         employeeAcronym: data.employeeAcronym || '?',
         employeeName: data.employeeName || '',
@@ -532,96 +606,113 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (pathname.startsWith('/api/advances/') && req.method === 'DELETE') {
-      const user = getAuthenticatedUser(req);
-      if (user && user.role === 'funcionario') {
-        return sendJson(res, 403, { error: 'Sem permissão.' });
+      const user = await getAuthenticatedUser(req);
+      if (!user) {
+        return sendJson(res, 401, { error: 'Autenticação necessária.' });
+      }
+      if (user.role !== 'ceo' && user.role !== 'gerente') {
+        return sendJson(res, 403, { error: 'Apenas Gerente e CEO podem excluir vales.' });
       }
       const id = pathname.replace('/api/advances/', '');
-      db.prepare('DELETE FROM advances WHERE id = ?').run(id);
+      await execute('DELETE FROM advances WHERE id = ?', [id]);
       return sendJson(res, 200, { success: true, id });
     }
 
+    // 12. GESTÃO DE EQUIPE (EXCLUSIVO: GERENTE OU CEO)
     if (pathname === '/api/employees' && req.method === 'POST') {
-      const user = getAuthenticatedUser(req);
-      if (user && user.role === 'funcionario') {
-        return sendJson(res, 403, { error: 'Sem permissão.' });
+      const user = await getAuthenticatedUser(req);
+      if (!user) {
+        return sendJson(res, 401, { error: 'Autenticação necessária.' });
+      }
+      if (user.role !== 'ceo' && user.role !== 'gerente') {
+        return sendJson(res, 403, { error: 'Apenas Gerente e CEO podem cadastrar funcionários.' });
       }
 
       const data = await parseJsonBody(req);
       const id = data.id || `emp_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
       const active = data.active !== undefined ? (data.active ? 1 : 0) : 1;
 
-      const stmt = db.prepare(`
-        INSERT INTO employees (id, name, acronym, active)
-        VALUES (?, ?, ?, ?)
-        ON CONFLICT(id) DO UPDATE SET
-          name = excluded.name,
-          acronym = excluded.acronym,
-          active = excluded.active
-      `);
+      await execute(
+        `INSERT INTO employees (id, name, acronym, active)
+         VALUES (?, ?, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET
+           name = excluded.name,
+           acronym = excluded.acronym,
+           active = excluded.active`,
+        [id, data.name.trim(), data.acronym.trim().toUpperCase(), active]
+      );
 
-      stmt.run(id, data.name.trim(), data.acronym.trim().toUpperCase(), active);
       return sendJson(res, 201, { success: true, id });
     }
 
-    // Exclusão definitiva de Funcionário
     if (pathname.startsWith('/api/employees/') && req.method === 'DELETE') {
-      const user = getAuthenticatedUser(req);
-      if (user && user.role === 'funcionario') {
-        return sendJson(res, 403, { error: 'Sem permissão.' });
+      const user = await getAuthenticatedUser(req);
+      if (!user) {
+        return sendJson(res, 401, { error: 'Autenticação necessária.' });
+      }
+      if (user.role !== 'ceo' && user.role !== 'gerente') {
+        return sendJson(res, 403, { error: 'Apenas Gerente e CEO podem excluir funcionários.' });
       }
 
       const id = pathname.replace('/api/employees/', '');
-      // Desvincula contas de login associadas
-      db.prepare('UPDATE users SET employee_id = NULL WHERE employee_id = ?').run(id);
-      // Remove vales associados para não violar foreign key
-      db.prepare('DELETE FROM advances WHERE employee_id = ?').run(id);
-      // Remove da tabela de funcionários
-      db.prepare('DELETE FROM employees WHERE id = ?').run(id);
+      await execute('UPDATE users SET employee_id = NULL WHERE employee_id = ?', [id]);
+      await execute('DELETE FROM advances WHERE employee_id = ?', [id]);
+      await execute('DELETE FROM employees WHERE id = ?', [id]);
 
       return sendJson(res, 200, { success: true, id });
     }
 
     if (pathname.match(/^\/api\/employees\/[^/]+\/toggle$/) && req.method === 'PATCH') {
-      const user = getAuthenticatedUser(req);
-      if (user && user.role === 'funcionario') {
-        return sendJson(res, 403, { error: 'Sem permissão.' });
+      const user = await getAuthenticatedUser(req);
+      if (!user) {
+        return sendJson(res, 401, { error: 'Autenticação necessária.' });
       }
+      if (user.role !== 'ceo' && user.role !== 'gerente') {
+        return sendJson(res, 403, { error: 'Apenas Gerente e CEO podem alterar status de funcionários.' });
+      }
+
       const id = pathname.split('/')[3];
-      db.prepare('UPDATE employees SET active = CASE WHEN active = 1 THEN 0 ELSE 1 END WHERE id = ?').run(id);
+      const emp = await queryOne('SELECT active FROM employees WHERE id = ?', [id]);
+      if (emp) {
+        const nextActive = (emp.active === 1 || emp.active === true) ? 0 : 1;
+        await execute('UPDATE employees SET active = ? WHERE id = ?', [nextActive, id]);
+      }
       return sendJson(res, 200, { success: true, id });
     }
 
+    // 13. FECHAMENTO DE QUINZENA (EXCLUSIVO: GERENTE OU CEO)
     if (pathname === '/api/quinzena/close' && req.method === 'POST') {
-      const user = getAuthenticatedUser(req);
-      if (user && user.role === 'funcionario') {
-        return sendJson(res, 403, { error: 'Sem permissão.' });
+      const user = await getAuthenticatedUser(req);
+      if (!user) {
+        return sendJson(res, 401, { error: 'Autenticação necessária.' });
+      }
+      if (user.role !== 'ceo' && user.role !== 'gerente') {
+        return sendJson(res, 403, { error: 'Apenas Gerente e CEO podem fechar a quinzena.' });
       }
 
       const summary = await parseJsonBody(req);
-      const currentQId = getCurrentQuinzenaId();
+      const currentQId = await getCurrentQuinzenaId();
 
-      const stmt = db.prepare(`
-        INSERT INTO closed_quinzenas (
+      await execute(
+        `INSERT INTO closed_quinzenas (
           id, closed_at, total_revenue, total_products, total_house, total_team,
           total_advances, total_net_payable, wash_count, employees_summary
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `);
-
-      stmt.run(
-        currentQId,
-        new Date().toISOString(),
-        Number(summary.totalRevenue) || 0,
-        Number(summary.totalProducts) || 0,
-        Number(summary.totalHouse) || 0,
-        Number(summary.totalTeam) || 0,
-        Number(summary.totalAdvances) || 0,
-        Number(summary.totalNetPayable) || 0,
-        Number(summary.washCount) || 0,
-        JSON.stringify(summary.employeesSummary || [])
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          currentQId,
+          new Date().toISOString(),
+          Number(summary.totalRevenue) || 0,
+          Number(summary.totalProducts) || 0,
+          Number(summary.totalHouse) || 0,
+          Number(summary.teamValue || summary.totalTeam) || 0,
+          Number(summary.totalAdvances) || 0,
+          Number(summary.totalNetPayable) || 0,
+          Number(summary.washCount) || 0,
+          JSON.stringify(summary.employeesSummary || []),
+        ]
       );
 
-      const nextQId = setNextQuinzenaId();
+      const nextQId = await setNextQuinzenaId();
       return sendJson(res, 200, { success: true, closedId: currentQId, nextQuinzenaId: nextQId });
     }
 
@@ -632,6 +723,9 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
+// Inicializa banco de dados (tabelas, migrações e seed do CEO) antes de abrir a porta
+await initDatabase();
+
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`[Banco Online SQLite] Servidor com Autenticação e RBAC rodando em http://0.0.0.0:${PORT}`);
+  console.log(`[Gerente Virtual] Servidor online rodando em http://0.0.0.0:${PORT} (${isPostgres ? 'PostgreSQL Cloud' : 'SQLite Local'})`);
 });

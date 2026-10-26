@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { DollarSign, Check } from 'lucide-react';
-import { formatCurrency } from '../services/calculations';
+import { DollarSign, Check, Calendar } from 'lucide-react';
+import { formatCurrency, getTodayDateString, formatWeekday } from '../services/calculations';
 
 export function AdvanceForm({ employees, onSaveAdvance }) {
   const [selectedEmpId, setSelectedEmpId] = useState('');
   const [value, setValue] = useState('');
   const [note, setNote] = useState('');
+  const [advanceDate, setAdvanceDate] = useState(() => getTodayDateString());
 
   const addQuickValue = (val) => {
     const current = Number(value) || 0;
@@ -34,6 +35,7 @@ export function AdvanceForm({ employees, onSaveAdvance }) {
       employeeName: emp?.name || '',
       value: valNum,
       note: note.trim(),
+      advanceDate: advanceDate || getTodayDateString(),
     });
 
     setValue('');
@@ -49,6 +51,44 @@ export function AdvanceForm({ employees, onSaveAdvance }) {
           style={{ width: 26, height: 26, objectFit: 'contain' }}
         />
         Lançar Vale / Adiantamento
+      </div>
+
+      {/* Data do Vale */}
+      <div className="form-group">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <label className="form-label" style={{ marginBottom: 0 }}>
+            Data do Vale
+          </label>
+          <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#fbbf24' }}>
+            📅 {formatWeekday(advanceDate)}
+          </span>
+        </div>
+        <div style={{ position: 'relative', marginTop: 6 }}>
+          <input
+            type="date"
+            className="input-field"
+            value={advanceDate}
+            onChange={(e) => setAdvanceDate(e.target.value)}
+            required
+            style={{
+              paddingLeft: 40,
+              color: '#ffffff',
+              fontSize: '0.95rem',
+              fontWeight: 700,
+            }}
+          />
+          <Calendar
+            size={18}
+            color="#fbbf24"
+            style={{
+              position: 'absolute',
+              left: 12,
+              top: '50%',
+              transform: 'translateY(-50%)',
+              pointerEvents: 'none',
+            }}
+          />
+        </div>
       </div>
 
       {/* Seleção do Funcionário por Sigla */}

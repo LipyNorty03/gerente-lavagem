@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Truck, Check, Sparkles, Building, CreditCard, RotateCcw } from 'lucide-react';
-import { calculateWashSplit, formatCurrency } from '../services/calculations';
+import { Truck, Check, Sparkles, Building, CreditCard, RotateCcw, Calendar } from 'lucide-react';
+import { calculateWashSplit, formatCurrency, getTodayDateString, formatWeekday } from '../services/calculations';
 import { getRecentCompanies } from '../services/storage';
 
 const PAYMENT_METHODS = [
@@ -11,6 +11,7 @@ const PAYMENT_METHODS = [
 ];
 
 export function WashForm({ employees, onSaveWash, editingWash, onCancelEdit }) {
+  const [serviceDate, setServiceDate] = useState(() => getTodayDateString());
   const [plate, setPlate] = useState('');
   const [company, setCompany] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('pix');
@@ -25,13 +26,14 @@ export function WashForm({ employees, onSaveWash, editingWash, onCancelEdit }) {
   // Se estiver em modo de edição
   useEffect(() => {
     if (editingWash) {
+      setServiceDate(editingWash.serviceDate || editingWash.date || (editingWash.createdAt ? editingWash.createdAt.substring(0, 10) : getTodayDateString()));
       setPlate(editingWash.plate || '');
       setCompany(editingWash.company || '');
       setPaymentMethod(editingWash.paymentMethod || 'pix');
       setTotalValue(String(editingWash.totalValue || ''));
       setSelectedEmpIds(editingWash.employeeIds || []);
     } else {
-      // Se tiver funcionários ativos e nenhum selecionado, começa vazio para o gerente escolher
+      setServiceDate(getTodayDateString());
       setSelectedEmpIds([]);
     }
   }, [editingWash]);
@@ -85,6 +87,8 @@ export function WashForm({ employees, onSaveWash, editingWash, onCancelEdit }) {
     const acronyms = selectedEmployees.map((e) => e.acronym);
 
     const washData = {
+      serviceDate: serviceDate || getTodayDateString(),
+      date: serviceDate || getTodayDateString(),
       plate: plate.trim().toUpperCase(),
       company: company.trim(),
       paymentMethod,
@@ -101,6 +105,8 @@ export function WashForm({ employees, onSaveWash, editingWash, onCancelEdit }) {
     if (editingWash) {
       washData.id = editingWash.id;
       washData.createdAt = editingWash.createdAt;
+    } else {
+      washData.createdAt = new Date(serviceDate + 'T12:00:00Z').toISOString();
     }
 
     onSaveWash(washData);
@@ -123,6 +129,22 @@ export function WashForm({ employees, onSaveWash, editingWash, onCancelEdit }) {
           style={{ width: 28, height: 28, objectFit: 'contain' }}
         />
         {editingWash ? 'Editar Lavagem' : 'Registrar Nova Lavagem'}
+      </div>
+
+      {/* Data do Serviço com Dia da Semana */}
+      <div className="form-group">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+          <label className="form-label" style={{ marginBottom: 0 }}>Data do Serviço</label>
+          <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#38bdf8' }}>
+            📅 {formatWeekday(serviceDate)}
+          </span>
+        </div>
+        <input
+          type="date"
+          className="input-field"
+          value={serviceDate}
+          onChange={(e) => setServiceDate(e.target.value)}
+        />
       </div>
 
       {/* Placa do Caminhão */}

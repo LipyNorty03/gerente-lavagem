@@ -77,3 +77,52 @@ export function formatDateTime(dateString) {
     minute: '2-digit',
   });
 }
+
+/**
+ * Retorna a data no formato YYYY-MM-DD local
+ */
+export function getTodayDateString() {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const d = String(now.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+/**
+ * Retorna o dia da semana formatado em português (ex: "Segunda-feira")
+ */
+export function formatWeekday(dateInput) {
+  if (!dateInput) return '';
+  let d;
+  if (typeof dateInput === 'string' && dateInput.includes('-') && !dateInput.includes('T')) {
+    const [y, m, day] = dateInput.split('-').map(Number);
+    d = new Date(y, m - 1, day, 12, 0, 0);
+  } else {
+    d = new Date(dateInput);
+  }
+  const name = d.toLocaleDateString('pt-BR', { weekday: 'long' });
+  return name.charAt(0).toUpperCase() + name.slice(1);
+}
+
+/**
+ * Formata cabeçalho completo do dia: "Segunda-feira, 20/10/2026"
+ */
+export function formatDayHeader(dateInput) {
+  if (!dateInput) return '';
+  let d;
+  if (typeof dateInput === 'string' && dateInput.includes('-') && !dateInput.includes('T')) {
+    const [y, m, day] = dateInput.split('-').map(Number);
+    d = new Date(y, m - 1, day, 12, 0, 0);
+  } else {
+    d = new Date(dateInput);
+  }
+  const weekday = d.toLocaleDateString('pt-BR', { weekday: 'long' });
+  const weekdayCapitalized = weekday.charAt(0).toUpperCase() + weekday.slice(1);
+  const formattedDate = d.toLocaleDateString('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  });
+  return `${weekdayCapitalized}, ${formattedDate}`;
+}

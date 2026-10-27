@@ -658,6 +658,26 @@ const server = http.createServer(async (req, res) => {
       const data = await parseJsonBody(req);
       const id = data.id || `emp_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
       const active = data.active !== undefined ? (data.active ? 1 : 0) : 1;
+      const cleanName = (data.name || '').trim();
+      const cleanAcronym = (data.acronym || '').trim().toUpperCase();
+
+      if (!cleanName) {
+        return sendJson(res, 400, { error: 'O nome do funcionário é obrigatório.' });
+      }
+      if (!cleanAcronym) {
+        return sendJson(res, 400, { error: 'A sigla do funcionário é obrigatória.' });
+      }
+
+      // Validação de sigla duplicada com mensagem amigável
+      const conflict = await queryOne(
+        'SELECT id, name FROM employees WHERE acronym = ? AND id != ?',
+        [cleanAcronym, id]
+      );
+      if (conflict) {
+        return sendJson(res, 400, {
+          error: `A sigla "${cleanAcronym}" já está em uso pelo funcionário "${conflict.name}". Por favor, escolha outra sigla (ex: JN, JL ou JAN).`
+        });
+      }
 
       await execute(
         `INSERT INTO employees (id, name, acronym, active)
@@ -666,10 +686,14 @@ const server = http.createServer(async (req, res) => {
            name = excluded.name,
            acronym = excluded.acronym,
            active = excluded.active`,
-        [id, data.name.trim(), data.acronym.trim().toUpperCase(), active]
+        [id, cleanName, cleanAcronym, active]
       );
 
-      return sendJson(res, 201, { success: true, id });
+      return sendJson(res, 201, {
+        success: true,
+        id,
+        employee: { id, name: cleanName, acronym: cleanAcronym, active },
+      });
     }
 
     if (pathname.startsWith('/api/employees/') && req.method === 'DELETE') {

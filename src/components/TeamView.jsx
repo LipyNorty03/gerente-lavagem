@@ -11,14 +11,27 @@ export function TeamView({ employees, onSaveEmployee, onToggleActive, onDeleteEm
     const newName = e.target.value;
     setName(newName);
     if (!editingId && !acronym) {
-      const parts = newName.trim().split(' ');
+      const parts = newName.trim().split(/\s+/);
+      let candidate = '';
       if (parts.length >= 2) {
-        setAcronym((parts[0][0] + parts[1][0]).toUpperCase());
+        candidate = (parts[0][0] + parts[1][0]).toUpperCase();
       } else if (parts[0] && parts[0].length >= 2) {
-        setAcronym(parts[0].substring(0, 2).toUpperCase());
+        candidate = parts[0].substring(0, 2).toUpperCase();
       }
+
+      // Se a sigla de 2 letras já estiver em uso, tenta primeira + próxima consoante ou 3 letras
+      if (candidate && employees.some((emp) => emp.id !== editingId && emp.acronym.toUpperCase() === candidate)) {
+        if (parts[0].length >= 3) {
+          candidate = parts[0].substring(0, 3).toUpperCase();
+        }
+      }
+      setAcronym(candidate);
     }
   };
+
+  const conflictEmp = employees.find(
+    (emp) => emp.id !== editingId && emp.acronym.trim().toUpperCase() === acronym.trim().toUpperCase()
+  );
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -28,6 +41,12 @@ export function TeamView({ employees, onSaveEmployee, onToggleActive, onDeleteEm
     }
     if (!acronym.trim()) {
       alert('Informe a sigla do funcionário.');
+      return;
+    }
+    if (conflictEmp) {
+      alert(
+        `A sigla "${acronym.trim().toUpperCase()}" já está sendo usada pelo funcionário "${conflictEmp.name}". Por favor, escolha outra sigla (ex: JN, JL ou JAN).`
+      );
       return;
     }
 
@@ -83,15 +102,26 @@ export function TeamView({ employees, onSaveEmployee, onToggleActive, onDeleteEm
           <input
             type="text"
             className="input-field plate-input"
-            style={{ width: '140px', textAlign: 'center', fontSize: '1.2rem' }}
+            style={{
+              width: '140px',
+              textAlign: 'center',
+              fontSize: '1.2rem',
+              borderColor: conflictEmp ? '#ef4444' : undefined,
+            }}
             placeholder="CS"
             maxLength={3}
             value={acronym}
             onChange={(e) => setAcronym(e.target.value.toUpperCase())}
           />
-          <p style={{ color: '#64748b', fontSize: '0.75rem', marginTop: 4 }}>
-            Esta sigla aparecerá nos botões de lançamento rápido no pátio.
-          </p>
+          {conflictEmp ? (
+            <p style={{ color: '#f87171', fontSize: '0.8rem', fontWeight: 700, marginTop: 4 }}>
+              ⚠️ A sigla "{acronym}" já pertence a {conflictEmp.name}. Use outra sigla (ex: JN, JL ou JAN).
+            </p>
+          ) : (
+            <p style={{ color: '#64748b', fontSize: '0.75rem', marginTop: 4 }}>
+              Esta sigla aparecerá nos botões de lançamento rápido no pátio.
+            </p>
+          )}
         </div>
 
         <div style={{ display: 'flex', gap: 10 }}>

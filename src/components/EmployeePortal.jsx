@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Truck, DollarSign, LogOut, RefreshCw, Calendar, CheckCircle2, Users, Target } from 'lucide-react';
+import { Truck, DollarSign, LogOut, RefreshCw, Calendar, CheckCircle2, Users, Target, Coins } from 'lucide-react';
 import { fetchMyPortalData } from '../services/api';
 import { formatCurrency, formatDateTime, formatDayHeader, groupWashesByWeekAndDay, calculateGoalStatus } from '../services/calculations';
 
@@ -264,64 +264,79 @@ export function EmployeePortal({ user, onLogout }) {
           </div>
         </div>
 
-        {/* Abas: Meus Caminhões vs Meus Vales */}
-        <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+        {/* Abas: Meus Serviços vs Minhas Comissões vs Meus Vales */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 16 }}>
           <button
             type="button"
             onClick={() => setActiveTab('washes')}
             style={{
-              flex: 1,
-              padding: '12px',
+              padding: '10px 4px',
               backgroundColor: activeTab === 'washes' ? '#10b981' : '#151f32',
               color: activeTab === 'washes' ? '#fff' : '#94a3b8',
-              border: '1.5px solid #24334d',
+              border: activeTab === 'washes' ? '1.5px solid #34d399' : '1px solid #24334d',
               borderRadius: '12px',
               fontWeight: 800,
-              fontSize: '0.9rem',
+              fontSize: '0.8rem',
               cursor: 'pointer',
               display: 'flex',
+              flexDirection: 'column',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: 8,
+              gap: 4,
             }}
           >
-            <img
-              src="/icons/nav-wash.png"
-              alt="Caminhões"
-              style={{ width: 22, height: 22, objectFit: 'contain' }}
-            />
-            Meus Serviços ({washes.length})
+            <Truck size={18} />
+            <span>Serviços ({washes.length})</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('commissions')}
+            style={{
+              padding: '10px 4px',
+              backgroundColor: activeTab === 'commissions' ? '#0284c7' : '#151f32',
+              color: activeTab === 'commissions' ? '#fff' : '#94a3b8',
+              border: activeTab === 'commissions' ? '1.5px solid #38bdf8' : '1px solid #24334d',
+              borderRadius: '12px',
+              fontWeight: 800,
+              fontSize: '0.8rem',
+              cursor: 'pointer',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 4,
+            }}
+          >
+            <Coins size={18} />
+            <span>Comissões</span>
           </button>
 
           <button
             type="button"
             onClick={() => setActiveTab('advances')}
             style={{
-              flex: 1,
-              padding: '12px',
+              padding: '10px 4px',
               backgroundColor: activeTab === 'advances' ? '#f59e0b' : '#151f32',
               color: activeTab === 'advances' ? '#fff' : '#94a3b8',
-              border: '1.5px solid #24334d',
+              border: activeTab === 'advances' ? '1.5px solid #fbbf24' : '1px solid #24334d',
               borderRadius: '12px',
               fontWeight: 800,
-              fontSize: '0.9rem',
+              fontSize: '0.8rem',
               cursor: 'pointer',
               display: 'flex',
+              flexDirection: 'column',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: 8,
+              gap: 4,
             }}
           >
-            <img
-              src="/icons/nav-advance.png"
-              alt="Vales"
-              style={{ width: 22, height: 22, objectFit: 'contain' }}
-            />
-            Meus Vales ({advances.length})
+            <DollarSign size={18} />
+            <span>Vales ({advances.length})</span>
           </button>
         </div>
 
-        {/* 1. LISTA DE SERVIÇOS DO FUNCIONÁRIO (Separados em Semana 1 e Semana 2, datas crescentes) */}
+        {/* 1. LISTA DE SERVIÇOS DO FUNCIONÁRIO (Caminhões lavados e parceiros) */}
         {activeTab === 'washes' && (
           <div>
             {weekGroups.length === 0 ? (
@@ -334,7 +349,198 @@ export function EmployeePortal({ user, onLogout }) {
                 <p style={{ color: '#cbd5e1', fontWeight: 700 }}>Nenhum caminhão registrado ainda.</p>
                 <p style={{ color: '#94a3b8', fontSize: '0.8rem', marginTop: 4 }}>
                   Assim que o gerente lançar um caminhão incluindo sua sigla [{user.employeeAcronym}], ele
-                  aparecerá aqui com quem lavou com você e sua comissão.
+                  aparecerá aqui com quem lavou com você.
+                </p>
+              </div>
+            ) : (
+              weekGroups.map((week) => (
+                <div key={week.id} style={{ marginBottom: 24 }}>
+                  {/* Divisor de Semana */}
+                  <div
+                    style={{
+                      background:
+                        week.id === 'semana_1'
+                          ? 'linear-gradient(135deg, #0c2d48 0%, #143e66 100%)'
+                          : 'linear-gradient(135deg, #1e1b4b 0%, #312e81 100%)',
+                      border: week.id === 'semana_1' ? '2px solid #38bdf8' : '2px solid #818cf8',
+                      borderRadius: 14,
+                      padding: '12px 16px',
+                      marginBottom: 12,
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      boxShadow: '0 4px 14px rgba(0,0,0,0.3)',
+                    }}
+                  >
+                    <div>
+                      <span
+                        style={{
+                          backgroundColor: week.id === 'semana_1' ? '#0284c7' : '#4f46e5',
+                          color: '#ffffff',
+                          padding: '4px 10px',
+                          borderRadius: 8,
+                          fontWeight: 900,
+                          fontSize: '0.82rem',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.04em',
+                        }}
+                      >
+                        {week.label}
+                      </span>
+                      <div style={{ fontSize: '0.74rem', color: '#cbd5e1', marginTop: 4 }}>
+                        {week.washCount} {week.washCount === 1 ? 'serviço' : 'serviços'} com sua participação
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Dias da Semana em Ordem Crescente (segunda 23, terça 24...) */}
+                  {week.days.map((group) => {
+                    const headerTitle =
+                      group.date === 'Sem Data' ? 'Data Não Informada' : formatDayHeader(group.date);
+
+                    return (
+                      <div key={group.date} style={{ marginBottom: 14 }}>
+                        {/* Cabeçalho do Dia */}
+                        <div
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            padding: '10px 14px',
+                            backgroundColor: '#151f32',
+                            borderRadius: '12px 12px 0 0',
+                            border: '1px solid #24334d',
+                            borderBottom: '2px solid #10b981',
+                          }}
+                        >
+                          <div
+                            style={{
+                              fontSize: '0.92rem',
+                              fontWeight: 900,
+                              color: '#34d399',
+                              textTransform: 'uppercase',
+                              letterSpacing: '-0.01em',
+                            }}
+                          >
+                            📅 {headerTitle}
+                          </div>
+                          <div style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 700 }}>
+                            {group.washes.length} {group.washes.length === 1 ? 'caminhão' : 'caminhões'}
+                          </div>
+                        </div>
+
+                        {/* Lista de Caminhões do Dia */}
+                        <div
+                          style={{
+                            backgroundColor: '#0b1120',
+                            border: '1px solid #24334d',
+                            borderTop: 'none',
+                            borderRadius: '0 0 12px 12px',
+                            padding: '10px 10px 4px 10px',
+                          }}
+                        >
+                          {group.washes.map((w) => {
+                            const acronymsList =
+                              w.employeeAcronyms && w.employeeAcronyms.length > 0
+                                ? w.employeeAcronyms.join(', ')
+                                : user.employeeAcronym;
+
+                            return (
+                              <div
+                                key={w.id}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'space-between',
+                                  padding: '10px 12px',
+                                  backgroundColor: '#131d2e',
+                                  borderRadius: '10px',
+                                  border: '1px solid #1e293b',
+                                  marginBottom: 8,
+                                }}
+                              >
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  {/* Formato: 350 — SIGLAS (CL, PA) */}
+                                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
+                                    <span
+                                      style={{
+                                        fontSize: '1.25rem',
+                                        fontWeight: 900,
+                                        color: '#34d399',
+                                        letterSpacing: '-0.02em',
+                                      }}
+                                    >
+                                      {w.totalValue}
+                                    </span>
+                                    <span style={{ color: '#64748b', fontWeight: 800 }}>—</span>
+                                    <span
+                                      style={{
+                                        fontSize: '1.05rem',
+                                        fontWeight: 800,
+                                        color: '#f8fafc',
+                                        letterSpacing: '0.02em',
+                                      }}
+                                    >
+                                      {acronymsList}
+                                    </span>
+                                  </div>
+
+                                  <div
+                                    style={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: 6,
+                                      marginTop: 4,
+                                      fontSize: '0.72rem',
+                                      color: '#94a3b8',
+                                      flexWrap: 'wrap',
+                                    }}
+                                  >
+                                    <span
+                                      style={{
+                                        backgroundColor: '#0c2d48',
+                                        color: '#38bdf8',
+                                        border: '1px solid #0284c7',
+                                        fontWeight: 800,
+                                        padding: '2px 8px',
+                                        borderRadius: 6,
+                                        fontSize: '0.74rem',
+                                        textTransform: 'uppercase',
+                                      }}
+                                    >
+                                      🏢 {w.company || 'Veículo / Cliente Avulso'}
+                                    </span>
+                                    {w.plate && (
+                                      <span style={{ color: '#94a3b8', fontSize: '0.72rem', fontWeight: 600 }}>
+                                        Placa: {w.plate}
+                                      </span>
+                                    )}
+                                    <span style={{ color: '#64748b' }}>•</span>
+                                    <span style={{ textTransform: 'uppercase' }}>{w.paymentMethod}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ))
+            )}
+          </div>
+        )}
+
+        {/* 2. ÁREA SEPARADA: LISTA DE COMISSÕES & METAS DIÁRIAS */}
+        {activeTab === 'commissions' && (
+          <div>
+            {weekGroups.length === 0 ? (
+              <div className="card" style={{ textAlign: 'center', padding: '36px 16px' }}>
+                <Coins size={48} color="#38bdf8" style={{ margin: '0 auto 10px', opacity: 0.85 }} />
+                <p style={{ color: '#cbd5e1', fontWeight: 700 }}>Nenhuma comissão registrada ainda nesta quinzena.</p>
+                <p style={{ color: '#94a3b8', fontSize: '0.8rem', marginTop: 4 }}>
+                  Assim que os caminhões forem lançados, suas comissões e acompanhamento de metas aparecerão aqui.
                 </p>
               </div>
             ) : (
@@ -379,7 +585,7 @@ export function EmployeePortal({ user, onLogout }) {
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
                     <div style={{ backgroundColor: '#162032', padding: 10, borderRadius: 10, border: '1px solid #1e293b' }}>
                       <div style={{ fontSize: '0.7rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 700 }}>
-                        Total Realizado
+                        Total de Comissões
                       </div>
                       <div style={{ fontSize: '1.25rem', fontWeight: 900, color: '#34d399', marginTop: 2 }}>
                         {formatCurrency(goalSummary.totalCommission)}
@@ -509,275 +715,242 @@ export function EmployeePortal({ user, onLogout }) {
                   </div>
                 </div>
 
+                {/* Lista de Comissões por Semana e Dia */}
                 {weekGroups.map((week) => (
-                <div key={week.id} style={{ marginBottom: 24 }}>
-                  {/* Divisor / Destaque de Semana (Semana 1 e Semana 2) */}
-                  <div
-                    style={{
-                      background:
-                        week.id === 'semana_1'
-                          ? 'linear-gradient(135deg, #0c2d48 0%, #143e66 100%)'
-                          : 'linear-gradient(135deg, #1e1b4b 0%, #312e81 100%)',
-                      border: week.id === 'semana_1' ? '2px solid #38bdf8' : '2px solid #818cf8',
-                      borderRadius: 14,
-                      padding: '12px 16px',
-                      marginBottom: 12,
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      boxShadow: '0 4px 14px rgba(0,0,0,0.3)',
-                    }}
-                  >
-                    <div>
-                      <span
-                        style={{
-                          backgroundColor: week.id === 'semana_1' ? '#0284c7' : '#4f46e5',
-                          color: '#ffffff',
-                          padding: '4px 10px',
-                          borderRadius: 8,
-                          fontWeight: 900,
-                          fontSize: '0.82rem',
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.04em',
-                        }}
-                      >
-                        {week.label}
-                      </span>
-                      <div style={{ fontSize: '0.74rem', color: '#cbd5e1', marginTop: 4 }}>
-                        {week.washCount} {week.washCount === 1 ? 'serviço' : 'serviços'} com sua participação
-                      </div>
-                    </div>
-
-                    <div style={{ textAlign: 'right' }}>
-                      <div style={{ fontSize: '0.7rem', color: '#cbd5e1', textTransform: 'uppercase', fontWeight: 700 }}>
-                        Minha Comissão
-                      </div>
-                      <div style={{ fontSize: '1.25rem', fontWeight: 900, color: '#34d399' }}>
-                        {formatCurrency(week.totalCommission)}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Dias da Semana em Ordem Crescente (segunda 23, terça 24...) */}
-                  {week.days.map((group) => {
-                    const headerTitle =
-                      group.date === 'Sem Data' ? 'Data Não Informada' : formatDayHeader(group.date);
-                    const dayTarget = Number(dailyTargets[group.date]) || 0;
-                    const goalStatus = calculateGoalStatus(group.totalCommission, dayTarget);
-
-                    return (
-                      <div key={group.date} style={{ marginBottom: 14 }}>
-                        {/* Cabeçalho do Dia com Meta Diária Individual */}
-                        <div
+                  <div key={week.id} style={{ marginBottom: 24 }}>
+                    {/* Divisor / Destaque de Semana */}
+                    <div
+                      style={{
+                        background:
+                          week.id === 'semana_1'
+                            ? 'linear-gradient(135deg, #0c2d48 0%, #143e66 100%)'
+                            : 'linear-gradient(135deg, #1e1b4b 0%, #312e81 100%)',
+                        border: week.id === 'semana_1' ? '2px solid #38bdf8' : '2px solid #818cf8',
+                        borderRadius: 14,
+                        padding: '12px 16px',
+                        marginBottom: 12,
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        boxShadow: '0 4px 14px rgba(0,0,0,0.3)',
+                      }}
+                    >
+                      <div>
+                        <span
                           style={{
-                            backgroundColor: '#151f32',
-                            borderRadius: '12px 12px 0 0',
-                            border: '1px solid #24334d',
-                            borderBottom: `3px solid ${goalStatus.border || '#10b981'}`,
-                            padding: '10px 14px',
+                            backgroundColor: week.id === 'semana_1' ? '#0284c7' : '#4f46e5',
+                            color: '#ffffff',
+                            padding: '4px 10px',
+                            borderRadius: 8,
+                            fontWeight: 900,
+                            fontSize: '0.82rem',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.04em',
                           }}
                         >
+                          {week.label}
+                        </span>
+                        <div style={{ fontSize: '0.74rem', color: '#cbd5e1', marginTop: 4 }}>
+                          Comissões dos seus serviços
+                        </div>
+                      </div>
+
+                      <div style={{ textAlign: 'right' }}>
+                        <div style={{ fontSize: '0.7rem', color: '#cbd5e1', textTransform: 'uppercase', fontWeight: 700 }}>
+                          Total da Semana
+                        </div>
+                        <div style={{ fontSize: '1.25rem', fontWeight: 900, color: '#34d399' }}>
+                          {formatCurrency(week.totalCommission)}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Dias da Semana em Ordem Crescente com Meta Individual */}
+                    {week.days.map((group) => {
+                      const headerTitle =
+                        group.date === 'Sem Data' ? 'Data Não Informada' : formatDayHeader(group.date);
+                      const dayTarget = Number(dailyTargets[group.date]) || 0;
+                      const goalStatus = calculateGoalStatus(group.totalCommission, dayTarget);
+
+                      return (
+                        <div key={group.date} style={{ marginBottom: 14 }}>
+                          {/* Cabeçalho do Dia com Meta Diária Individual */}
                           <div
                             style={{
-                              display: 'flex',
-                              justifyContent: 'space-between',
-                              alignItems: 'center',
-                              marginBottom: 8,
+                              backgroundColor: '#151f32',
+                              borderRadius: '12px 12px 0 0',
+                              border: '1px solid #24334d',
+                              borderBottom: `3px solid ${goalStatus.border || '#10b981'}`,
+                              padding: '10px 14px',
                             }}
                           >
                             <div
                               style={{
-                                fontSize: '0.92rem',
-                                fontWeight: 900,
-                                color: '#f8fafc',
-                                textTransform: 'uppercase',
-                                letterSpacing: '-0.01em',
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                marginBottom: 8,
                               }}
                             >
-                              📅 {headerTitle}
+                              <div
+                                style={{
+                                  fontSize: '0.92rem',
+                                  fontWeight: 900,
+                                  color: '#f8fafc',
+                                  textTransform: 'uppercase',
+                                  letterSpacing: '-0.01em',
+                                }}
+                              >
+                                📅 {headerTitle}
+                              </div>
+                              <div style={{ textAlign: 'right' }}>
+                                <div style={{ fontSize: '0.68rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 700 }}>
+                                  Comissão do Dia
+                                </div>
+                                <div style={{ fontSize: '1.05rem', color: '#34d399', fontWeight: 900 }}>
+                                  {formatCurrency(group.totalCommission)}
+                                </div>
+                              </div>
                             </div>
-                            <div style={{ textAlign: 'right' }}>
-                              <div style={{ fontSize: '0.68rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 700 }}>
-                                Minha Comissão
+
+                            {/* Linha de Definição da Meta e Status Colorido */}
+                            <div
+                              style={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                gap: 8,
+                                backgroundColor: '#0e1726',
+                                padding: '6px 10px',
+                                borderRadius: 8,
+                                border: `1px solid ${goalStatus.border || '#1e293b'}`,
+                                flexWrap: 'wrap',
+                              }}
+                            >
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#cbd5e1' }}>
+                                  🎯 Meta do Dia: R$
+                                </span>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="10"
+                                  placeholder="Definir"
+                                  value={dailyTargets[group.date] ?? ''}
+                                  onChange={(e) => handleTargetChange(group.date, e.target.value)}
+                                  style={{
+                                    width: 75,
+                                    padding: '3px 6px',
+                                    fontSize: '0.82rem',
+                                    fontWeight: 800,
+                                    backgroundColor: '#1b273d',
+                                    color: '#ffffff',
+                                    border: '1px solid #334155',
+                                    borderRadius: 6,
+                                    outline: 'none',
+                                  }}
+                                />
                               </div>
-                              <div style={{ fontSize: '1.05rem', color: '#34d399', fontWeight: 900 }}>
-                                {formatCurrency(group.totalCommission)}
-                              </div>
+
+                              {goalStatus.status !== 'none' ? (
+                                <div
+                                  style={{
+                                    fontSize: '0.72rem',
+                                    fontWeight: 900,
+                                    padding: '3px 8px',
+                                    borderRadius: 6,
+                                    color: goalStatus.color,
+                                    backgroundColor: goalStatus.bg,
+                                    border: `1px solid ${goalStatus.border}`,
+                                    letterSpacing: '0.01em',
+                                  }}
+                                >
+                                  {goalStatus.label}
+                                </div>
+                              ) : (
+                                <span style={{ fontSize: '0.7rem', color: '#64748b', fontStyle: 'italic' }}>
+                                  Sem meta definida
+                                </span>
+                              )}
                             </div>
                           </div>
 
-                          {/* Linha de Definição da Meta e Status Colorido */}
+                          {/* Lista das Comissões dos Caminhões do Dia */}
                           <div
                             style={{
-                              display: 'flex',
-                              justifyContent: 'space-between',
-                              alignItems: 'center',
-                              gap: 8,
-                              backgroundColor: '#0e1726',
-                              padding: '6px 10px',
-                              borderRadius: 8,
-                              border: `1px solid ${goalStatus.border || '#1e293b'}`,
-                              flexWrap: 'wrap',
+                              backgroundColor: '#0b1120',
+                              border: '1px solid #24334d',
+                              borderTop: 'none',
+                              borderRadius: '0 0 12px 12px',
+                              padding: '10px 10px 4px 10px',
                             }}
                           >
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                              <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#cbd5e1' }}>
-                                🎯 Meta do Dia: R$
-                              </span>
-                              <input
-                                type="number"
-                                min="0"
-                                step="10"
-                                placeholder="Definir"
-                                value={dailyTargets[group.date] ?? ''}
-                                onChange={(e) => handleTargetChange(group.date, e.target.value)}
-                                style={{
-                                  width: 75,
-                                  padding: '3px 6px',
-                                  fontSize: '0.82rem',
-                                  fontWeight: 800,
-                                  backgroundColor: '#1b273d',
-                                  color: '#ffffff',
-                                  border: '1px solid #334155',
-                                  borderRadius: 6,
-                                  outline: 'none',
-                                }}
-                              />
-                            </div>
+                            {group.washes.map((w) => {
+                              const acronymsList =
+                                w.employeeAcronyms && w.employeeAcronyms.length > 0
+                                  ? w.employeeAcronyms.join(', ')
+                                  : user.employeeAcronym;
 
-                            {goalStatus.status !== 'none' ? (
-                              <div
-                                style={{
-                                  fontSize: '0.72rem',
-                                  fontWeight: 900,
-                                  padding: '3px 8px',
-                                  borderRadius: 6,
-                                  color: goalStatus.color,
-                                  backgroundColor: goalStatus.bg,
-                                  border: `1px solid ${goalStatus.border}`,
-                                  letterSpacing: '0.01em',
-                                }}
-                              >
-                                {goalStatus.label}
-                              </div>
-                            ) : (
-                              <span style={{ fontSize: '0.7rem', color: '#64748b', fontStyle: 'italic' }}>
-                                Sem meta definida
-                              </span>
-                            )}
+                              return (
+                                <div
+                                  key={w.id}
+                                  style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    padding: '10px 12px',
+                                    backgroundColor: '#131d2e',
+                                    borderRadius: '10px',
+                                    border: '1px solid #1e293b',
+                                    marginBottom: 8,
+                                  }}
+                                >
+                                  <div style={{ flex: 1, minWidth: 0 }}>
+                                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
+                                      <span
+                                        style={{
+                                          fontSize: '1.15rem',
+                                          fontWeight: 900,
+                                          color: '#34d399',
+                                        }}
+                                      >
+                                        +{formatCurrency(w.valuePerEmployee)}
+                                      </span>
+                                      <span style={{ color: '#64748b', fontWeight: 800 }}>•</span>
+                                      <span style={{ fontSize: '0.85rem', color: '#cbd5e1', fontWeight: 700 }}>
+                                        {w.totalValue} — {acronymsList}
+                                      </span>
+                                    </div>
+                                    <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: 3 }}>
+                                      🏢 {w.company || 'Veículo / Avulso'} {w.plate ? `(Placa: ${w.plate})` : ''}
+                                    </div>
+                                  </div>
+
+                                  <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                                    <span
+                                      style={{
+                                        backgroundColor: '#064e3b',
+                                        color: '#34d399',
+                                        border: '1px solid #10b981',
+                                        fontSize: '0.72rem',
+                                        fontWeight: 800,
+                                        padding: '3px 8px',
+                                        borderRadius: 6,
+                                      }}
+                                    >
+                                      Comissão
+                                    </span>
+                                  </div>
+                                </div>
+                              );
+                            })}
                           </div>
                         </div>
-
-                        {/* Lista de Caminhões do Dia */}
-                        <div
-                          style={{
-                            backgroundColor: '#0b1120',
-                            border: '1px solid #24334d',
-                            borderTop: 'none',
-                            borderRadius: '0 0 12px 12px',
-                            padding: '10px 10px 4px 10px',
-                          }}
-                        >
-                          {group.washes.map((w) => {
-                            const acronymsList =
-                              w.employeeAcronyms && w.employeeAcronyms.length > 0
-                                ? w.employeeAcronyms.join(', ')
-                                : user.employeeAcronym;
-
-                            return (
-                              <div
-                                key={w.id}
-                                style={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'space-between',
-                                  padding: '10px 12px',
-                                  backgroundColor: '#131d2e',
-                                  borderRadius: '10px',
-                                  border: '1px solid #1e293b',
-                                  marginBottom: 8,
-                                }}
-                              >
-                                <div style={{ flex: 1, minWidth: 0, paddingRight: 8 }}>
-                                  {/* Formato Solicitado: 350 — SIGLAS (CL, PA, JO) */}
-                                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
-                                    <span
-                                      style={{
-                                        fontSize: '1.25rem',
-                                        fontWeight: 900,
-                                        color: '#34d399',
-                                        letterSpacing: '-0.02em',
-                                      }}
-                                    >
-                                      {w.totalValue}
-                                    </span>
-                                    <span style={{ color: '#64748b', fontWeight: 800 }}>—</span>
-                                    <span
-                                      style={{
-                                        fontSize: '1.05rem',
-                                        fontWeight: 800,
-                                        color: '#f8fafc',
-                                        letterSpacing: '0.02em',
-                                      }}
-                                    >
-                                      {acronymsList}
-                                    </span>
-                                  </div>
-
-                                  <div
-                                    style={{
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      gap: 6,
-                                      marginTop: 4,
-                                      fontSize: '0.72rem',
-                                      color: '#94a3b8',
-                                      flexWrap: 'wrap',
-                                    }}
-                                  >
-                                    <span
-                                      style={{
-                                        backgroundColor: '#0c2d48',
-                                        color: '#38bdf8',
-                                        border: '1px solid #0284c7',
-                                        fontWeight: 800,
-                                        padding: '2px 8px',
-                                        borderRadius: 6,
-                                        fontSize: '0.74rem',
-                                        textTransform: 'uppercase',
-                                      }}
-                                    >
-                                      🏢 {w.company || 'Veículo / Cliente Avulso'}
-                                    </span>
-                                    {w.plate && (
-                                      <span style={{ color: '#94a3b8', fontSize: '0.72rem', fontWeight: 600 }}>
-                                        Placa: {w.plate}
-                                      </span>
-                                    )}
-                                    <span style={{ color: '#64748b' }}>•</span>
-                                    <span style={{ textTransform: 'uppercase' }}>{w.paymentMethod}</span>
-                                  </div>
-                                </div>
-
-                                {/* Valor da Comissão do Lavador */}
-                                <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                                  <div style={{ fontSize: '0.68rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 700 }}>
-                                    Minha Parte
-                                  </div>
-                                  <div style={{ fontSize: '1.2rem', fontWeight: 900, color: '#38bdf8' }}>
-                                    +{formatCurrency(w.valuePerEmployee)}
-                                  </div>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              ))}
-            </>
+                      );
+                    })}
+                  </div>
+                ))}
+              </>
             )}
           </div>
         )}

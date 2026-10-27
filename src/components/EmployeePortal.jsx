@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Truck, DollarSign, LogOut, RefreshCw, Calendar, CheckCircle2, Users } from 'lucide-react';
+import { Truck, DollarSign, LogOut, RefreshCw, Calendar, CheckCircle2, Users, Target } from 'lucide-react';
 import { fetchMyPortalData } from '../services/api';
-import { formatCurrency, formatDateTime, formatDayHeader, groupWashesByWeekAndDay } from '../services/calculations';
+import { formatCurrency, formatDateTime, formatDayHeader, groupWashesByWeekAndDay, calculateGoalStatus } from '../services/calculations';
 
 export function EmployeePortal({ user, onLogout }) {
   const [data, setData] = useState(null);
@@ -13,6 +13,42 @@ export function EmployeePortal({ user, onLogout }) {
       return 'washes';
     }
   });
+
+  // Metas diárias definidas individualmente pelo funcionário por dia (persistido por usuário)
+  const [dailyTargets, setDailyTargets] = useState(() => {
+    try {
+      const saved = localStorage.getItem(`gl_targets_${user.id}`);
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  const [quickTargetVal, setQuickTargetVal] = useState('');
+
+  const handleTargetChange = (dateKey, value) => {
+    const numVal = value === '' ? '' : Math.max(0, Number(value));
+    const updated = { ...dailyTargets, [dateKey]: numVal };
+    setDailyTargets(updated);
+    try {
+      localStorage.setItem(`gl_targets_${user.id}`, JSON.stringify(updated));
+    } catch {}
+  };
+
+  const handleApplyQuickTarget = () => {
+    if (quickTargetVal === '') return;
+    const num = Math.max(0, Number(quickTargetVal));
+    const updated = { ...dailyTargets };
+    weekGroups.forEach((week) => {
+      week.days.forEach((day) => {
+        updated[day.date] = num;
+      });
+    });
+    setDailyTargets(updated);
+    try {
+      localStorage.setItem(`gl_targets_${user.id}`, JSON.stringify(updated));
+    } catch {}
+  };
 
   const setActiveTab = (tab) => {
     setActiveTabState(tab);
@@ -52,6 +88,45 @@ export function EmployeePortal({ user, onLogout }) {
       return dateA.localeCompare(dateB);
     });
   }, [advances]);
+
+  // Cálculo consolidado das metas diárias e do valor total final
+  const goalSummary = useMemo(() => {
+    let totalCommission = 0;
+    let totalTarget = 0;
+    let greenCount = 0;
+    let yellowCount = 0;
+    let redCount = 0;
+    let configuredDays = 0;
+
+    weekGroups.forEach((week) => {
+      week.days.forEach((day) => {
+        const comm = Number(day.totalCommission) || 0;
+        totalCommission += comm;
+        const targetVal = dailyTargets[day.date];
+        if (targetVal !== undefined && targetVal !== '' && Number(targetVal) > 0) {
+          const target = Number(targetVal);
+          configuredDays++;
+          totalTarget += target;
+          const st = calculateGoalStatus(comm, target);
+          if (st.status === 'green') greenCount++;
+          else if (st.status === 'yellow') yellowCount++;
+          else if (st.status === 'red') redCount++;
+        }
+      });
+    });
+
+    const overallStatus = calculateGoalStatus(totalCommission, totalTarget);
+
+    return {
+      totalCommission,
+      totalTarget,
+      greenCount,
+      yellowCount,
+      redCount,
+      configuredDays,
+      overallStatus,
+    };
+  }, [weekGroups, dailyTargets]);
 
   return (
     <div className="app-container" style={{ paddingBottom: 24 }}>
@@ -263,7 +338,178 @@ export function EmployeePortal({ user, onLogout }) {
                 </p>
               </div>
             ) : (
-              weekGroups.map((week) => (
+              <>
+                {/* Card de Metas Diárias e Valor Total Acumulado */}
+                <div
+                  className="card"
+                  style={{
+                    backgroundColor: '#0f172a',
+                    border: `2px solid ${goalSummary.overallStatus.border || '#334155'}`,
+                    borderRadius: 14,
+                    padding: '16px',
+                    marginBottom: 16,
+                    boxShadow: '0 6px 20px rgba(0,0,0,0.3)',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <Target size={20} color={goalSummary.overallStatus.color || '#38bdf8'} />
+                      <span style={{ fontSize: '0.95rem', fontWeight: 900, color: '#f8fafc', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
+                        Minhas Metas Diárias
+                      </span>
+                    </div>
+                    {goalSummary.configuredDays > 0 && (
+                      <span
+                        style={{
+                          fontSize: '0.72rem',
+                          fontWeight: 800,
+                          padding: '3px 8px',
+                          borderRadius: 6,
+                          backgroundColor: goalSummary.overallStatus.bg,
+                          color: goalSummary.overallStatus.color,
+                          border: `1px solid ${goalSummary.overallStatus.border}`,
+                        }}
+                      >
+                        {goalSummary.overallStatus.label}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Valores: Total Realizado vs Total das Metas */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
+                    <div style={{ backgroundColor: '#162032', padding: 10, borderRadius: 10, border: '1px solid #1e293b' }}>
+                      <div style={{ fontSize: '0.7rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 700 }}>
+                        Total Realizado
+                      </div>
+                      <div style={{ fontSize: '1.25rem', fontWeight: 900, color: '#34d399', marginTop: 2 }}>
+                        {formatCurrency(goalSummary.totalCommission)}
+                      </div>
+                    </div>
+                    <div style={{ backgroundColor: '#162032', padding: 10, borderRadius: 10, border: '1px solid #1e293b' }}>
+                      <div style={{ fontSize: '0.7rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 700 }}>
+                        Total de Metas
+                      </div>
+                      <div style={{ fontSize: '1.25rem', fontWeight: 900, color: '#f8fafc', marginTop: 2 }}>
+                        {formatCurrency(goalSummary.totalTarget)}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Contadores dos status */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 12 }}>
+                    <div
+                      style={{
+                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                        border: '1px solid #10b981',
+                        borderRadius: 8,
+                        padding: '6px 4px',
+                        textAlign: 'center',
+                      }}
+                    >
+                      <div style={{ fontSize: '1.1rem', fontWeight: 900, color: '#34d399' }}>
+                        {goalSummary.greenCount}
+                      </div>
+                      <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#a7f3d0' }}>
+                        Com Folga
+                      </div>
+                      <div style={{ fontSize: '0.58rem', color: '#94a3b8' }}>(&gt; Meta + R$30)</div>
+                    </div>
+
+                    <div
+                      style={{
+                        backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                        border: '1px solid #f59e0b',
+                        borderRadius: 8,
+                        padding: '6px 4px',
+                        textAlign: 'center',
+                      }}
+                    >
+                      <div style={{ fontSize: '1.1rem', fontWeight: 900, color: '#fbbf24' }}>
+                        {goalSummary.yellowCount}
+                      </div>
+                      <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#fde68a' }}>
+                        Até R$ 30
+                      </div>
+                      <div style={{ fontSize: '0.58rem', color: '#94a3b8' }}>(Meta a Meta+30)</div>
+                    </div>
+
+                    <div
+                      style={{
+                        backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                        border: '1px solid #ef4444',
+                        borderRadius: 8,
+                        padding: '6px 4px',
+                        textAlign: 'center',
+                      }}
+                    >
+                      <div style={{ fontSize: '1.1rem', fontWeight: 900, color: '#f87171' }}>
+                        {goalSummary.redCount}
+                      </div>
+                      <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#fca5a5' }}>
+                        Não Batidas
+                      </div>
+                      <div style={{ fontSize: '0.58rem', color: '#94a3b8' }}>(&lt; Meta)</div>
+                    </div>
+                  </div>
+
+                  {/* Definidor rápido para todos os dias */}
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: 8,
+                      backgroundColor: '#131d2e',
+                      padding: '8px 12px',
+                      borderRadius: 10,
+                      border: '1px solid #1e293b',
+                      flexWrap: 'wrap',
+                    }}
+                  >
+                    <span style={{ fontSize: '0.75rem', color: '#cbd5e1', fontWeight: 700 }}>
+                      Definir meta padrão para todos os dias:
+                    </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <input
+                        type="number"
+                        min="0"
+                        step="10"
+                        placeholder="R$ 100"
+                        value={quickTargetVal}
+                        onChange={(e) => setQuickTargetVal(e.target.value)}
+                        style={{
+                          width: 80,
+                          padding: '4px 8px',
+                          fontSize: '0.8rem',
+                          fontWeight: 800,
+                          backgroundColor: '#0b1120',
+                          color: '#ffffff',
+                          border: '1px solid #334155',
+                          borderRadius: 6,
+                          outline: 'none',
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={handleApplyQuickTarget}
+                        style={{
+                          backgroundColor: '#0284c7',
+                          color: '#ffffff',
+                          border: 'none',
+                          borderRadius: 6,
+                          padding: '5px 10px',
+                          fontSize: '0.75rem',
+                          fontWeight: 800,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Aplicar
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {weekGroups.map((week) => (
                 <div key={week.id} style={{ marginBottom: 24 }}>
                   {/* Divisor / Destaque de Semana (Semana 1 e Semana 2) */}
                   <div
@@ -316,35 +562,109 @@ export function EmployeePortal({ user, onLogout }) {
                   {week.days.map((group) => {
                     const headerTitle =
                       group.date === 'Sem Data' ? 'Data Não Informada' : formatDayHeader(group.date);
+                    const dayTarget = Number(dailyTargets[group.date]) || 0;
+                    const goalStatus = calculateGoalStatus(group.totalCommission, dayTarget);
 
                     return (
                       <div key={group.date} style={{ marginBottom: 14 }}>
-                        {/* Cabeçalho do Dia */}
+                        {/* Cabeçalho do Dia com Meta Diária Individual */}
                         <div
                           style={{
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center',
-                            padding: '10px 14px',
                             backgroundColor: '#151f32',
                             borderRadius: '12px 12px 0 0',
                             border: '1px solid #24334d',
-                            borderBottom: '2px solid #10b981',
+                            borderBottom: `3px solid ${goalStatus.border || '#10b981'}`,
+                            padding: '10px 14px',
                           }}
                         >
                           <div
                             style={{
-                              fontSize: '0.92rem',
-                              fontWeight: 900,
-                              color: '#34d399',
-                              textTransform: 'uppercase',
-                              letterSpacing: '-0.01em',
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              marginBottom: 8,
                             }}
                           >
-                            📅 {headerTitle}
+                            <div
+                              style={{
+                                fontSize: '0.92rem',
+                                fontWeight: 900,
+                                color: '#f8fafc',
+                                textTransform: 'uppercase',
+                                letterSpacing: '-0.01em',
+                              }}
+                            >
+                              📅 {headerTitle}
+                            </div>
+                            <div style={{ textAlign: 'right' }}>
+                              <div style={{ fontSize: '0.68rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 700 }}>
+                                Minha Comissão
+                              </div>
+                              <div style={{ fontSize: '1.05rem', color: '#34d399', fontWeight: 900 }}>
+                                {formatCurrency(group.totalCommission)}
+                              </div>
+                            </div>
                           </div>
-                          <div style={{ fontSize: '0.78rem', color: '#a7f3d0', fontWeight: 800 }}>
-                            {formatCurrency(group.totalCommission)}
+
+                          {/* Linha de Definição da Meta e Status Colorido */}
+                          <div
+                            style={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              gap: 8,
+                              backgroundColor: '#0e1726',
+                              padding: '6px 10px',
+                              borderRadius: 8,
+                              border: `1px solid ${goalStatus.border || '#1e293b'}`,
+                              flexWrap: 'wrap',
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#cbd5e1' }}>
+                                🎯 Meta do Dia: R$
+                              </span>
+                              <input
+                                type="number"
+                                min="0"
+                                step="10"
+                                placeholder="Definir"
+                                value={dailyTargets[group.date] ?? ''}
+                                onChange={(e) => handleTargetChange(group.date, e.target.value)}
+                                style={{
+                                  width: 75,
+                                  padding: '3px 6px',
+                                  fontSize: '0.82rem',
+                                  fontWeight: 800,
+                                  backgroundColor: '#1b273d',
+                                  color: '#ffffff',
+                                  border: '1px solid #334155',
+                                  borderRadius: 6,
+                                  outline: 'none',
+                                }}
+                              />
+                            </div>
+
+                            {goalStatus.status !== 'none' ? (
+                              <div
+                                style={{
+                                  fontSize: '0.72rem',
+                                  fontWeight: 900,
+                                  padding: '3px 8px',
+                                  borderRadius: 6,
+                                  color: goalStatus.color,
+                                  backgroundColor: goalStatus.bg,
+                                  border: `1px solid ${goalStatus.border}`,
+                                  letterSpacing: '0.01em',
+                                }}
+                              >
+                                {goalStatus.label}
+                              </div>
+                            ) : (
+                              <span style={{ fontSize: '0.7rem', color: '#64748b', fontStyle: 'italic' }}>
+                                Sem meta definida
+                              </span>
+                            )}
                           </div>
                         </div>
 
@@ -456,7 +776,8 @@ export function EmployeePortal({ user, onLogout }) {
                     );
                   })}
                 </div>
-              ))
+              ))}
+            </>
             )}
           </div>
         )}

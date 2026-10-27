@@ -264,3 +264,71 @@ export function groupWashesByWeekAndDay(washes = []) {
 
   return result;
 }
+
+/**
+ * Calcula o status de uma meta diária ou acumulada
+ * @param {number} total - Valor total de comissão realizada
+ * @param {number} meta - Meta estabelecida em reais
+ * Regras aprovadas:
+ * - Verde: Bateu com folga (> Meta + R$ 30)
+ * - Amarelo: Passou até R$ 30 da meta (Meta <= Total <= Meta + R$ 30)
+ * - Vermelho: Não bateu (< Meta)
+ */
+export function calculateGoalStatus(total, meta) {
+  const t = Number(total) || 0;
+  const m = Number(meta) || 0;
+
+  if (m <= 0) {
+    return {
+      status: 'none',
+      label: 'Definir Meta',
+      shortLabel: 'Sem Meta',
+      color: '#94a3b8',
+      bg: 'rgba(148, 163, 184, 0.1)',
+      border: '#334155',
+      diff: 0,
+      missing: 0,
+    };
+  }
+
+  const diff = truncateToTwoDecimals(t - m);
+
+  if (t < m) {
+    const missing = truncateToTwoDecimals(m - t);
+    return {
+      status: 'red',
+      label: `Não bateu (Faltou ${formatCurrency(missing)})`,
+      shortLabel: `Faltou ${formatCurrency(missing)}`,
+      color: '#f87171',
+      bg: 'rgba(239, 68, 68, 0.18)',
+      border: '#ef4444',
+      diff,
+      missing,
+    };
+  }
+
+  if (t <= m + 30) {
+    return {
+      status: 'yellow',
+      label: `Passou até R$ 30 (+${formatCurrency(diff)})`,
+      shortLabel: `Meta batida (+${formatCurrency(diff)})`,
+      color: '#fbbf24',
+      bg: 'rgba(245, 158, 11, 0.2)',
+      border: '#f59e0b',
+      diff,
+      missing: 0,
+    };
+  }
+
+  return {
+    status: 'green',
+    label: `Bateu com folga (+${formatCurrency(diff)})`,
+    shortLabel: `Bateu com folga (+${formatCurrency(diff)})`,
+    color: '#34d399',
+    bg: 'rgba(16, 185, 129, 0.2)',
+    border: '#10b981',
+    diff,
+    missing: 0,
+  };
+}
+

@@ -223,7 +223,7 @@ export async function initDatabase() {
         if (Array.isArray(seedData.users)) {
           for (const u of seedData.users) {
             await execute(`INSERT INTO users (id, username, password_hash, salt, name, role, employee_id, created_at)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT (username) DO NOTHING`,
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT (id) DO NOTHING`,
               [u.id, u.username, u.password_hash, u.salt, u.name, u.role, u.employee_id, u.created_at]
             );
           }
